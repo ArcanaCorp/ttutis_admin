@@ -8,6 +8,8 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import { useSchoolYearData } from "@/hooks/useInstitutionData";
 
 import {
@@ -127,6 +129,7 @@ export default function Page() {
     const [yearForm, setYearForm] = useState({ name: "", starts_on: "", ends_on: "", status: "PLANNED" });
     const [classroomForm, setClassroomForm] = useState({ level: "PRIMARY", grade_label: "", grade_order: "", section_name: "", capacity: "", status: "ACTIVE" });
     const [enrollmentForm, setEnrollmentForm] = useState({ student_id: "", classroom_id: "", enrolled_at: "", status: "ACTIVE" });
+    const [enrollmentStudentSearch, setEnrollmentStudentSearch] = useState("");
 
     const selectedYear = academic_years.find(
         year => year.id === selectedYearId
@@ -173,6 +176,22 @@ export default function Page() {
             enrollment.student_id === student.id && enrollment.status === "ACTIVE"
         )
     ) : [];
+    const yearPagination = usePagination(academic_years, 12);
+    const classroomPagination = usePagination(yearClassrooms, 25);
+    const filteredAvailableStudents = availableStudents.filter(student =>
+        `${student.first_names || ""} ${student.last_names || ""} ${student.student_code || ""}`
+            .toLocaleLowerCase("es-PE")
+            .includes(enrollmentStudentSearch.trim().toLocaleLowerCase("es-PE")),
+    );
+    const availableStudentPagination = usePagination(filteredAvailableStudents, 25);
+    const availableStudentOptions = availableStudentPagination.items.some(
+        student => student.id === enrollmentForm.student_id,
+    )
+        ? availableStudentPagination.items
+        : [
+            ...availableStudents.filter(student => student.id === enrollmentForm.student_id),
+            ...availableStudentPagination.items,
+        ];
 
     const totalStudents = students.filter(
         student => student.status === "ACTIVE"
@@ -695,7 +714,7 @@ export default function Page() {
                 <div className="grid grid-cols-3 gap-md">
 
                     {academic_years.length > 0 ? (
-                        academic_years.map(year => {
+                        yearPagination.items.map(year => {
                             const status = getYearStatus(year.status);
 
                             const isSelected = selectedYear?.id === year.id;
@@ -760,6 +779,7 @@ export default function Page() {
                     )}
 
                 </div>
+                <Pagination {...yearPagination} onPageChange={yearPagination.setPage} />
             </section>
 
             {/* ENROLLMENT STATUS */}
@@ -910,7 +930,7 @@ export default function Page() {
                                 </thead>
 
                                 <tbody>
-                                    {yearClassrooms.map(classroom => {
+                                    {classroomPagination.items.map(classroom => {
                                         const studentCount = getClassroomStudents(classroom);
 
                                         return (
@@ -951,6 +971,7 @@ export default function Page() {
                                     })}
                                 </tbody>
                             </table>
+                            <Pagination {...classroomPagination} onPageChange={classroomPagination.setPage} />
                         </div>
                     ) : (
                         <div className="py-xl text-center">
@@ -1104,18 +1125,31 @@ export default function Page() {
                     <div className="rounded-md bg-surface-secondary p-md text-sm">
                         Año académico: <strong>{selectedYear?.name || "Sin año seleccionado"}</strong>
                     </div>
-                    <label className="flex flex-col gap-xs text-sm">
-                        <span className="font-medium">Alumno</span>
-                        <select className="w-full border radius-md bg-surface p-sm" value={enrollmentForm.student_id} onChange={event => setEnrollmentForm(current => ({ ...current, student_id: event.target.value }))} required>
+                    <div className="flex flex-col gap-xs text-sm">
+                        <label htmlFor="enrollment-student-select" className="font-medium">Alumno</label>
+                        <Input
+                            name="enrollment-student-search"
+                            aria-label="Buscar alumno para matricular"
+                            type="search"
+                            value={enrollmentStudentSearch}
+                            onChange={event => {
+                                setEnrollmentStudentSearch(event.target.value);
+                                availableStudentPagination.setPage(1);
+                            }}
+                            placeholder="Buscar por nombre o código"
+                            fullWidth
+                        />
+                        <select id="enrollment-student-select" className="w-full border radius-md bg-surface p-sm" value={enrollmentForm.student_id} onChange={event => setEnrollmentForm(current => ({ ...current, student_id: event.target.value }))} required>
                             <option value="" disabled>Selecciona un alumno</option>
-                            {availableStudents.map(student => (
+                            {availableStudentOptions.map(student => (
                                 <option key={student.id} value={student.id}>
                                     {[student.first_names, student.last_names].filter(Boolean).join(" ") || student.student_code || "Alumno"}
                                 </option>
                             ))}
                         </select>
+                        <Pagination {...availableStudentPagination} onPageChange={availableStudentPagination.setPage} />
                         {!availableStudents.length && <span className="text-xs text-secondary">No hay alumnos activos disponibles sin matrícula en este año.</span>}
-                    </label>
+                    </div>
                     <label className="flex flex-col gap-xs text-sm">
                         <span className="font-medium">Aula y sección</span>
                         <select className="w-full border radius-md bg-surface p-sm" value={enrollmentForm.classroom_id} onChange={event => setEnrollmentForm(current => ({ ...current, classroom_id: event.target.value }))} required>

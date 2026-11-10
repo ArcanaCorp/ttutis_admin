@@ -20,8 +20,14 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
+import Pagination from "@/components/ui/Pagination";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import usePagination from "@/hooks/usePagination";
 import { usePaymentsData } from "@/hooks/useInstitutionData";
+import {
+    calculateFeeBalance,
+    getCalculatedFeeStatus,
+} from "@/lib/payments/calculations.mjs";
 
 const statusLabels = {
     PAID: "Pagado",
@@ -59,19 +65,6 @@ function currencyFormat(amount, currency) {
         style: "currency",
         currency: currency || "PEN",
     }).format(Number(amount || 0));
-}
-
-function getFeeStatus(fee) {
-    if (fee.status === "WAIVED") return "WAIVED";
-
-    const amount = Number(fee.amount || 0);
-    const paid = Number(fee.paid_amount || 0);
-    const balance = Math.max(0, amount - paid);
-
-    if (balance <= 0) return "PAID";
-    if (fee.due_date && fee.due_date < dateInLima()) return "OVERDUE";
-    if (paid > 0) return "PARTIAL";
-    return "UNPAID";
 }
 
 function EmptyState({ title, description, icon: Icon = ReceiptText }) {
@@ -143,6 +136,7 @@ export default function Page() {
     const currencyValue = data.currency || currentInstitution?.currency || "PEN";
     const currency = /^[A-Z]{3}$/.test(currencyValue) ? currencyValue : "PEN";
     const term = search.trim().toLocaleLowerCase("es-PE");
+    const today = dateInLima();
 
     const getStudentName = studentId => {
         const student = students.find(item => item.id === studentId);
@@ -162,8 +156,8 @@ export default function Page() {
 
     const feeRows = yearFees.map(fee => ({
         ...fee,
-        calculated_status: getFeeStatus(fee),
-        balance: Math.max(0, Number(fee.amount || 0) - Number(fee.paid_amount || 0)),
+        calculated_status: getCalculatedFeeStatus(fee, today),
+        balance: calculateFeeBalance(fee),
     }));
 
     const matchesSearch = value => !term || value.toLocaleLowerCase("es-PE").includes(term);
@@ -172,13 +166,16 @@ export default function Page() {
         .filter(fee => matchesSearch(`${getStudentName(fee.student_id)} ${fee.concept} ${fee.period_label}`))
         .sort((first, second) => String(first.due_date || "").localeCompare(String(second.due_date || "")));
     const confirmedPayments = yearPayments.filter(payment => payment.status === "CONFIRMED");
-    const totalPaid = confirmedPayments.reduce((total, payment) => total + Number(payment.amount || 0), 0);
+    const totalPaid = confirmedPayments.reduce(
+        (total, payment) => total + Math.round(Number(payment.amount || 0) * 100),
+        0,
+    ) / 100;
     const totalPending = feeRows
         .filter(fee => !["PAID", "WAIVED"].includes(fee.calculated_status))
-        .reduce((total, fee) => total + fee.balance, 0);
+        .reduce((total, fee) => total + Math.round(fee.balance * 100), 0) / 100;
     const totalOverdue = feeRows
         .filter(fee => fee.calculated_status === "OVERDUE")
-        .reduce((total, fee) => total + fee.balance, 0);
+        .reduce((total, fee) => total + Math.round(fee.balance * 100), 0) / 100;
 
     const openModal = (mode, record = null) => {
         setActionError("");
@@ -276,7 +273,8 @@ export default function Page() {
         values: { id: fee.id },
     });
 
-    const renderFeeTable = rows => rows.length ? (
+    const renderFeeTable = (rows, pagination) => rows.length ? (
+        <>
         <div className="overflow-hidden rounded-lg border">
             <div className="grid grid-cols-6 gap-md bg-surface-secondary p-md text-xs font-semibold text-secondary">
                 <span>Alumno</span>
@@ -335,6 +333,10 @@ export default function Page() {
                 </div>
             ))}
         </div>
+        {pagination && (
+            <Pagination {...pagination} onPageChange={pagination.setPage} />
+        )}
+        </>
     ) : (
         <EmptyState
             title="No hay obligaciones para mostrar"
@@ -342,7 +344,8 @@ export default function Page() {
         />
     );
 
-    const renderPaymentsTable = rows => rows.length ? (
+    const renderPaymentsTable = (rows, pagination) => rows.length ? (
+        <>
         <div className="overflow-hidden rounded-lg border">
             <div className="grid grid-cols-6 gap-md bg-surface-secondary p-md text-xs font-semibold text-secondary">
                 <span>Fecha</span>
@@ -372,6 +375,10 @@ export default function Page() {
                 );
             })}
         </div>
+        {pagination && (
+            <Pagination {...pagination} onPageChange={pagination.setPage} />
+        )}
+        </>
     ) : (
         <EmptyState
             title="No hay pagos registrados"
@@ -385,6 +392,11 @@ export default function Page() {
         .sort((first, second) => new Date(second.paid_at) - new Date(first.paid_at));
     const visibleRules = yearRules.filter(rule => matchesSearch(`${rule.name} ${rule.scope_type}`));
     const visibleConcepts = concepts.filter(concept => matchesSearch(`${concept.name} ${concept.description || ""}`));
+    const pendingFees = visibleFees.filter(fee => !["PAID", "WAIVED"].includes(fee.calculated_status));
+    const feePagination = usePagination(pendingFees, 25);
+    const paymentPagination = usePagination(visiblePayments, 25);
+    const conceptPagination = usePagination(visibleConcepts, 25);
+    const rulePagination = usePagination(visibleRules, 25);
 
     return (
         <div className="page-shell">
@@ -482,8 +494,9 @@ export default function Page() {
                                     {canManage && <Button icon={Plus} onClick={() => openModal("concept")}>Nuevo concepto</Button>}
                                 </div>
                                 {visibleConcepts.length ? (
+                                    <>
                                     <div className="flex flex-col divide-y">
-                                        {visibleConcepts.map(concept => (
+                                        {conceptPagination.items.map(concept => (
                                             <div key={concept.id} className="flex flex-wrap items-center justify-between gap-md py-md">
                                                 <div>
                                                     <p className="font-semibold">{concept.name}</p>
@@ -508,6 +521,8 @@ export default function Page() {
                                             </div>
                                         ))}
                                     </div>
+                                    <Pagination {...conceptPagination} onPageChange={conceptPagination.setPage} />
+                                    </>
                                 ) : <EmptyState title="Aún no hay conceptos" description="Crea matrícula, pensión u otros conceptos de cobro." />}
                             </Card>
 
@@ -525,8 +540,9 @@ export default function Page() {
                                     {canManage && <Button icon={Plus} onClick={() => openModal("rule")}>Nueva regla</Button>}
                                 </div>
                                 {visibleRules.length ? (
+                                    <>
                                     <div className="flex flex-col divide-y">
-                                        {visibleRules.map(rule => {
+                                        {rulePagination.items.map(rule => {
                                             const concept = concepts.find(item => item.id === rule.fee_concept_id);
                                             const scopeNames = {
                                                 INSTITUTION: "Toda la institución",
@@ -567,6 +583,8 @@ export default function Page() {
                                             );
                                         })}
                                     </div>
+                                    <Pagination {...rulePagination} onPageChange={rulePagination.setPage} />
+                                    </>
                                 ) : <EmptyState title="Aún no hay reglas" description="Define periodicidad, calendario y destinatarios para generar cargos." />}
                             </Card>
                         </>
@@ -578,7 +596,7 @@ export default function Page() {
                                 <Input name="payments-search" aria-label="Buscar pagos" leftIcon={Search} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por alumno o referencia..." fullWidth />
                                 {canManage && <Button icon={Plus} onClick={() => openModal("payment")}>Registrar pago</Button>}
                             </div>
-                            {renderPaymentsTable(visiblePayments)}
+                            {renderPaymentsTable(paymentPagination.items, paymentPagination)}
                         </Card>
                     )}
 
@@ -596,7 +614,7 @@ export default function Page() {
                                     </select>
                                 </label>
                             </div>
-                            {renderFeeTable(visibleFees.filter(fee => !["PAID", "WAIVED"].includes(fee.calculated_status)))}
+                            {renderFeeTable(feePagination.items, feePagination)}
                         </Card>
                     )}
 
@@ -605,7 +623,7 @@ export default function Page() {
                             <div className="mb-md">
                                 <Input name="history-search" aria-label="Buscar en el historial" leftIcon={Search} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar alumno o referencia..." fullWidth />
                             </div>
-                            {renderPaymentsTable(visiblePayments)}
+                            {renderPaymentsTable(paymentPagination.items, paymentPagination)}
                         </Card>
                     )}
                 </>

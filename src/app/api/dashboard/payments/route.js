@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllPages } from "@/lib/pagination.mjs";
+import {
+    dateOnly,
+    getRuleDates,
+    getRuleStudentIds,
+    positiveMoney,
+} from "@/lib/payments/calculations.mjs";
 
 const fail = (message, status = 400) =>
     NextResponse.json({ error: message }, { status });
@@ -9,23 +16,11 @@ const CONCEPT_TYPES = ["MATRICULA", "PENSION", "OTHER"];
 const SCOPE_TYPES = ["INSTITUTION", "LEVEL", "GRADE", "CLASSROOM", "STUDENTS"];
 const FREQUENCIES = ["MONTHLY", "WEEKLY", "ONCE"];
 const PAYMENT_METHODS = ["CASH", "TRANSFER", "DEPOSIT", "OTHER"];
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 500;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const clean = value => typeof value === "string" ? value.trim() : "";
-const money = value => {
-    const amount = Number(value);
-    return Number.isFinite(amount) && amount > 0
-        ? Math.round(amount * 100) / 100
-        : null;
-};
-
-function dateOnly(value) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
-    if (!match) return null;
-    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-    return date.toISOString().slice(0, 10) === value ? value : null;
-}
+const money = positiveMoney;
 
 async function getContext(request, institutionId) {
     const sessionClient = await createSessionClient();
@@ -86,86 +81,15 @@ async function getContext(request, institutionId) {
 }
 
 async function readAll(admin, table, columns, institutionId, orderBy) {
-    const rows = [];
-    let start = 0;
-
-    while (true) {
-        let query = admin
-            .from(table)
-            .select(columns)
-            .eq("institution_id", institutionId);
-
-        if (orderBy) {
-            query = query.order(orderBy, { ascending: false });
-        }
-
-        const { data, error } = await query.range(start, start + PAGE_SIZE - 1);
-        if (error) throw error;
-        rows.push(...(data || []));
-        if (!data || data.length < PAGE_SIZE) break;
-        start += PAGE_SIZE;
-    }
-
-    return rows;
-}
-
-function firstDueDate(rule) {
-    const start = new Date(`${rule.starts_on}T00:00:00Z`);
-
-    if (rule.frequency === "ONCE") {
-        return start;
-    }
-
-    if (rule.frequency === "WEEKLY") {
-        start.setUTCDate(start.getUTCDate() + 7);
-        return start;
-    }
-
-    start.setUTCDate(1);
-    start.setUTCMonth(start.getUTCMonth() + 1);
-    return monthlyDueDate(start.getUTCFullYear(), start.getUTCMonth(), rule.due_day);
-}
-
-function monthlyDueDate(year, month, requestedDay) {
-    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    return new Date(Date.UTC(year, month, Math.min(Number(requestedDay), lastDay)));
-}
-
-function getRuleDates(rule, throughDate) {
-    const limitDate = dateOnly(throughDate);
-    if (!limitDate) throw new Error("La fecha final para generar obligaciones no es válida.");
-
-    const endDate = rule.ends_on && rule.ends_on < limitDate
-        ? rule.ends_on
-        : limitDate;
-    const dates = [];
-    let dueDate = firstDueDate(rule);
-
-    while (dueDate && dueDate.toISOString().slice(0, 10) <= endDate) {
-        dates.push(dueDate.toISOString().slice(0, 10));
-        if (dates.length > 1200) {
-            throw new Error("La regla genera más de 1,200 periodos. Reduce su vigencia antes de continuar.");
-        }
-        if (rule.frequency === "ONCE") break;
-        if (rule.frequency === "WEEKLY") {
-            dueDate.setUTCDate(dueDate.getUTCDate() + 7);
-        } else {
-            dueDate = monthlyDueDate(
-                dueDate.getUTCFullYear(),
-                dueDate.getUTCMonth() + 1,
-                rule.due_day,
-            );
-        }
-    }
-
-    return dates;
+    return fetchAllPages(async ({ from, to }) => {
+        let query = admin.from(table).select(columns).eq("institution_id", institutionId);
+        if (orderBy) query = query.order(orderBy, { ascending: false });
+        return query.range(from, to);
+    }, { pageSize: PAGE_SIZE });
 }
 
 async function getRuleStudents(admin, institutionId, rule, enrollments, classrooms, students) {
-    const activeStudentIds = new Set(students
-        .filter(student => student.status === "ACTIVE")
-        .map(student => student.id));
-
+    let selectedStudentIds = [];
     if (rule.scope_type === "STUDENTS") {
         const { data, error } = await admin
             .from("billing_rule_students")
@@ -173,36 +97,16 @@ async function getRuleStudents(admin, institutionId, rule, enrollments, classroo
             .eq("institution_id", institutionId)
             .eq("billing_rule_id", rule.id);
         if (error) throw error;
-        const activeEnrolledIds = new Set(enrollments
-            .filter(enrollment => enrollment.academic_year_id === rule.academic_year_id
-                && enrollment.status === "ACTIVE")
-            .map(enrollment => enrollment.student_id));
-
-        return [...new Set((data || [])
-            .map(row => row.student_id)
-            .filter(studentId => activeStudentIds.has(studentId) && activeEnrolledIds.has(studentId)))];
+        selectedStudentIds = (data || []).map(row => row.student_id);
     }
 
-    const matchingClassroomIds = new Set(classrooms
-        .filter(classroom => {
-            if (classroom.academic_year_id !== rule.academic_year_id) return false;
-            if (classroom.status !== "ACTIVE") return false;
-            if (rule.scope_type === "CLASSROOM") return classroom.id === rule.classroom_id;
-            if (rule.scope_type === "LEVEL") return classroom.level === rule.target_level;
-            if (rule.scope_type === "GRADE") {
-                return classroom.level === rule.target_level
-                    && classroom.grade_label === rule.target_grade;
-            }
-            return true;
-        })
-        .map(classroom => classroom.id));
-
-    return [...new Set(enrollments
-        .filter(enrollment => enrollment.academic_year_id === rule.academic_year_id
-            && enrollment.status === "ACTIVE"
-            && activeStudentIds.has(enrollment.student_id)
-            && matchingClassroomIds.has(enrollment.classroom_id))
-        .map(enrollment => enrollment.student_id))];
+    return getRuleStudentIds({
+        rule,
+        enrollments,
+        classrooms,
+        students,
+        selectedStudentIds,
+    });
 }
 
 async function createConcept(admin, institutionId, values) {

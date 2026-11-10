@@ -5,6 +5,8 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import PageHeader from "@/components/ui/PageHeader";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import { useAttendanceData } from "@/hooks/useInstitutionData";
 import { Activity, CalendarDays, CheckCircle2, Clock3, LogIn, LogOut, Search, UserRound } from "lucide-react";
 
@@ -46,6 +48,7 @@ export default function Page() {
         .filter(event => eventType === "ALL" || event.event_type === eventType)
         .filter(event => !term || `${getStudentName(event.student_id)} ${event.source} ${event.notes || ""}`.toLocaleLowerCase("es-PE").includes(term))
         .sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at));
+    const eventsPagination = usePagination(filteredEvents, 50);
 
     const entries = events.filter(event => event.event_type === "ENTRY").length;
     const exits = events.filter(event => ["EXIT", "TEMP_EXIT"].includes(event.event_type)).length;
@@ -77,10 +80,10 @@ export default function Page() {
             <Card variant="default" title="Registro de movimientos" subtitle="Movimientos registrados en esta institución" icon={Activity} iconVariant="info">
                 <div className="flex flex-col gap-md">
                     <div className="flex flex-col sm:flex-row gap-md">
-                        <Input name="attendance-search" aria-label="Buscar asistencia" leftIcon={Search} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por alumno, origen o nota..." fullWidth />
+                        <Input name="attendance-search" aria-label="Buscar asistencia" leftIcon={Search} value={search} onChange={event => { setSearch(event.target.value); eventsPagination.setPage(1); }} placeholder="Buscar por alumno, origen o nota..." fullWidth />
                         <label className="flex items-center gap-sm border radius-md px-md bg-surface">
                             <span className="text-sm text-secondary">Tipo</span>
-                            <select className="py-sm bg-transparent" value={eventType} onChange={event => setEventType(event.target.value)}>
+                            <select className="py-sm bg-transparent" value={eventType} onChange={event => { setEventType(event.target.value); eventsPagination.setPage(1); }}>
                                 <option value="ALL">Todos</option>
                                 {Object.entries(eventLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             </select>
@@ -92,7 +95,7 @@ export default function Page() {
                             <div className="grid grid-cols-3 gap-md bg-surface-secondary p-md text-xs font-semibold text-secondary">
                                 <span>Alumno</span><span>Movimiento</span><span>Fecha y hora</span>
                             </div>
-                            {filteredEvents.map(event => (
+                            {eventsPagination.items.map(event => (
                                 <div key={event.id} className="grid grid-cols-3 gap-md items-center border-t p-md">
                                     <div className="flex items-center gap-sm min-w-0">
                                         <span className="center w-10 h-10 rounded-full bg-surface-tertiary text-secondary"><UserRound size={18} /></span>
@@ -105,6 +108,7 @@ export default function Page() {
                                     <span className="inline-flex items-center gap-xs text-sm text-secondary"><Clock3 size={15} />{formatDateTime(event.occurred_at)}</span>
                                 </div>
                             ))}
+                            <Pagination {...eventsPagination} onPageChange={eventsPagination.setPage} />
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-sm border border-dashed radius-lg p-2xl text-center">

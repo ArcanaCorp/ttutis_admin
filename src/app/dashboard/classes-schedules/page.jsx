@@ -6,6 +6,8 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import Modal from "@/components/ui/Modal";
 import { useClassesSchedulesData } from "@/hooks/useInstitutionData";
 import {
@@ -122,6 +124,10 @@ export default function Page() {
                 (!selectedClassroom || assignment?.classroom_id === selectedClassroom.id);
         })
         .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const classroomPagination = usePagination(filteredClassrooms, 24);
+    const subjectPagination = usePagination(subjects, 25);
+    const assignmentPagination = usePagination(classroomAssignments, 25);
+    const schedulePagination = usePagination(daySchedules, 25);
 
     const stats = [
         {
@@ -286,8 +292,9 @@ export default function Page() {
                     </div>
 
                     {filteredClassrooms.length ? (
+                        <>
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-md">
-                            {filteredClassrooms.map(classroom => {
+                            {classroomPagination.items.map(classroom => {
                                 const count = getStudentsCount(classroom.id);
                                 const isSelected = selectedClassroom?.id === classroom.id;
                                 return (
@@ -325,6 +332,8 @@ export default function Page() {
                                 );
                             })}
                         </div>
+                        <Pagination {...classroomPagination} onPageChange={classroomPagination.setPage} />
+                        </>
                     ) : (
                         <div className="border border-dashed rounded-xl py-12 text-center">
                             <DoorOpen size={28} className="mx-auto text-gray-300" />
@@ -349,7 +358,10 @@ export default function Page() {
                     <Card variant="default" title="Catálogo de cursos" subtitle="Cursos disponibles para asignar en el año escolar." icon={BookMarked} iconVariant="primary">
                         <div className="flex flex-col gap-sm">
                             <div className="flex justify-end gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("subject")} disabled={!canManage}>Importar cursos</Button><Button size="sm" variant="outline" icon={Plus} onClick={() => openRecordForm("subject")} disabled={!canManage}>Nuevo curso</Button></div>
-                            {subjects.length ? subjects.map(subject => <div key={subject.id} className="flex items-center justify-between gap-md border-t py-sm"><div className="min-w-0"><p className="truncate text-sm font-medium">{subject.name}</p><p className="text-xs text-gray-500">{subject.code || "Sin código"}{subject.description ? ` · ${subject.description}` : ""}</p></div><div className="flex gap-xs"><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel={`Editar curso ${subject.name}`} onClick={() => openRecordForm("subject", subject)} disabled={!canManage}/><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel={`Eliminar curso ${subject.name}`} onClick={() => removeAcademicRecord("subject", subject, `el curso ${subject.name}`)} disabled={!canManage || assignments.some(item => item.subject_id === subject.id)} title={assignments.some(item => item.subject_id === subject.id) ? "Elimina primero las asignaciones asociadas" : "Eliminar curso"}/></div></div>) : <p className="border-t py-md text-sm text-gray-500">Todavía no hay cursos. Registra uno o importa una lista desde Excel.</p>}
+                            {subjects.length ? <>
+                                {subjectPagination.items.map(subject => <div key={subject.id} className="flex items-center justify-between gap-md border-t py-sm"><div className="min-w-0"><p className="truncate text-sm font-medium">{subject.name}</p><p className="text-xs text-gray-500">{subject.code || "Sin código"}{subject.description ? ` · ${subject.description}` : ""}</p></div><div className="flex gap-xs"><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel={`Editar curso ${subject.name}`} onClick={() => openRecordForm("subject", subject)} disabled={!canManage}/><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel={`Eliminar curso ${subject.name}`} onClick={() => removeAcademicRecord("subject", subject, `el curso ${subject.name}`)} disabled={!canManage || assignments.some(item => item.subject_id === subject.id)} title={assignments.some(item => item.subject_id === subject.id) ? "Elimina primero las asignaciones asociadas" : "Eliminar curso"}/></div></div>)}
+                                <Pagination {...subjectPagination} onPageChange={subjectPagination.setPage} />
+                            </> : <p className="border-t py-md text-sm text-gray-500">Todavía no hay cursos. Registra uno o importa una lista desde Excel.</p>}
                         </div>
                     </Card>
 
@@ -382,7 +394,7 @@ export default function Page() {
                             <div className="grid grid-cols-[1.2fr_1fr_auto] gap-md bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                                 <span>Curso</span><span>Profesor responsable</span><span>Acciones</span>
                             </div>
-                            {classroomAssignments.map(assignment => (
+                            {assignmentPagination.items.map(assignment => (
                                 <div key={assignment.id} className="grid grid-cols-[1.2fr_1fr_auto] gap-md items-center px-4 py-4 border-t">
                                     <div className="flex items-center gap-sm min-w-0">
                                         <div className="w-9 h-9 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
@@ -402,6 +414,7 @@ export default function Page() {
                                     <div className="flex items-center gap-xs"><span className="text-xs rounded-full bg-green-50 text-green-700 px-2.5 py-1">Asignado</span><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel="Editar asignación" onClick={() => openRecordForm("assignment", assignment)} disabled={!canManage} /><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel="Eliminar asignación" onClick={() => removeAcademicRecord("assignment", assignment, `la asignación de ${getSubject(assignment.subject_id)}`)} disabled={!canManage || schedules.some(item => item.course_assignment_id === assignment.id)} title={schedules.some(item => item.course_assignment_id === assignment.id) ? "Elimina primero los horarios asociados" : "Eliminar asignación"} /></div>
                                 </div>
                             ))}
+                            <Pagination {...assignmentPagination} onPageChange={assignmentPagination.setPage} />
                         </div>
                     ) : (
                         <div className="border border-dashed rounded-xl py-12 text-center">
@@ -453,7 +466,7 @@ export default function Page() {
                         </div>
                         {daySchedules.length ? (
                             <div className="divide-y">
-                                {daySchedules.map(schedule => {
+                                {schedulePagination.items.map(schedule => {
                                     const assignment = assignments.find(item => item.id === schedule.course_assignment_id);
                                     return (
                                         <div key={schedule.id} className="flex flex-col sm:flex-row sm:items-center gap-md px-4 py-4">
@@ -470,6 +483,7 @@ export default function Page() {
                                         </div>
                                     );
                                 })}
+                                <Pagination {...schedulePagination} onPageChange={schedulePagination.setPage} />
                             </div>
                         ) : (
                             <div className="py-12 text-center">

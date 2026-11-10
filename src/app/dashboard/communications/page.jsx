@@ -15,6 +15,8 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import { useCommunicationsData } from "@/hooks/useInstitutionData";
 
 const typeLabels = {
@@ -60,6 +62,7 @@ function CreateNotificationModal({
     const [form, setForm] = useState(emptyForm);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const [studentSearch, setStudentSearch] = useState("");
     const currentYear = academicYears.find(year => year.status === "ACTIVE")
         || academicYears[0];
     const currentYearId = form.academicYearId || currentYear?.id || "";
@@ -74,6 +77,26 @@ function CreateNotificationModal({
     ])).values()];
     const levels = [...new Set(grades.map(grade => grade.level))];
     const availableGrades = grades.filter(grade => grade.level === form.targetLevel);
+    const activeStudents = students
+        .filter(student => student.status === "ACTIVE")
+        .sort((first, second) =>
+            `${first.last_names} ${first.first_names}`.localeCompare(
+                `${second.last_names} ${second.first_names}`,
+                "es",
+            ),
+        );
+    const matchingStudents = activeStudents.filter(student =>
+        `${student.first_names || ""} ${student.last_names || ""} ${student.student_code || ""}`
+            .toLocaleLowerCase("es-PE")
+            .includes(studentSearch.trim().toLocaleLowerCase("es-PE")),
+    );
+    const studentPagination = usePagination(matchingStudents, 25);
+    const studentOptions = studentPagination.items.some(student => student.id === form.studentId)
+        ? studentPagination.items
+        : [
+            ...activeStudents.filter(student => student.id === form.studentId),
+            ...studentPagination.items,
+        ];
 
     const update = event => {
         const { name, value } = event.target;
@@ -106,6 +129,7 @@ function CreateNotificationModal({
         if (saving) return;
         setError("");
         setForm(emptyForm);
+        setStudentSearch("");
         onClose();
     };
 
@@ -126,6 +150,7 @@ function CreateNotificationModal({
                     : null,
             });
             setForm(emptyForm);
+            setStudentSearch("");
             onClose();
         } catch (createError) {
             setError(createError.message || "No se pudo crear la comunicación.");
@@ -258,9 +283,22 @@ function CreateNotificationModal({
                 )}
 
                 {form.audienceType === "STUDENT" && (
-                    <label className="flex flex-col gap-xs text-sm font-medium">
-                        Alumno
+                    <div className="flex flex-col gap-xs text-sm font-medium">
+                        <label htmlFor="communication-student-select">Alumno</label>
+                        <Input
+                            name="communication-student-search"
+                            aria-label="Buscar alumno destinatario"
+                            type="search"
+                            value={studentSearch}
+                            onChange={event => {
+                                setStudentSearch(event.target.value);
+                                studentPagination.setPage(1);
+                            }}
+                            placeholder="Buscar por nombre o código"
+                            fullWidth
+                        />
                         <select
+                            id="communication-student-select"
                             name="studentId"
                             value={form.studentId}
                             onChange={update}
@@ -268,22 +306,15 @@ function CreateNotificationModal({
                             required
                         >
                             <option value="">Selecciona un alumno</option>
-                            {students
-                                .filter(student => student.status === "ACTIVE")
-                                .sort((first, second) =>
-                                    `${first.last_names} ${first.first_names}`.localeCompare(
-                                        `${second.last_names} ${second.first_names}`,
-                                        "es",
-                                    ),
-                                )
-                                .map(student => (
+                            {studentOptions.map(student => (
                                     <option key={student.id} value={student.id}>
                                         {student.last_names}, {student.first_names}
                                         {student.student_code ? ` · ${student.student_code}` : ""}
                                     </option>
-                                ))}
+                            ))}
                         </select>
-                    </label>
+                        <Pagination {...studentPagination} onPageChange={studentPagination.setPage} />
+                    </div>
                 )}
 
                 <Input
@@ -396,6 +427,7 @@ export default function Page() {
                 .includes(term),
         )
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const updatesPagination = usePagination(filtered, 25);
 
     const formatDate = value => new Intl.DateTimeFormat("es-PE", {
         timeZone: "America/Lima",
@@ -511,7 +543,10 @@ export default function Page() {
                             aria-label="Buscar comunicaciones"
                             leftIcon={Search}
                             value={search}
-                            onChange={event => setSearch(event.target.value)}
+                            onChange={event => {
+                                setSearch(event.target.value);
+                                updatesPagination.setPage(1);
+                            }}
                             placeholder="Buscar por título o contenido..."
                             fullWidth
                         />
@@ -520,7 +555,10 @@ export default function Page() {
                             <select
                                 className="bg-transparent py-sm"
                                 value={selectedType}
-                                onChange={event => setSelectedType(event.target.value)}
+                                onChange={event => {
+                                    setSelectedType(event.target.value);
+                                    updatesPagination.setPage(1);
+                                }}
                             >
                                 <option value="ALL">Todos</option>
                                 {Object.entries(typeLabels).map(([value, label]) => (
@@ -532,7 +570,9 @@ export default function Page() {
                         </label>
                     </div>
 
-                    {filtered.length ? filtered.map(item => (
+                    {filtered.length ? (
+                        <>
+                            {updatesPagination.items.map(item => (
                         <article
                             key={item.id}
                             className="flex flex-col gap-sm border-b py-md last:border-0"
@@ -559,7 +599,10 @@ export default function Page() {
                                 </p>
                             )}
                         </article>
-                    )) : (
+                            ))}
+                            <Pagination {...updatesPagination} onPageChange={updatesPagination.setPage} />
+                        </>
+                    ) : (
                         <div className="flex flex-col items-center gap-sm rounded-lg border border-dashed p-2xl text-center">
                             <Bell size={28} className="text-tertiary" />
                             <p className="font-semibold">

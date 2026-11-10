@@ -15,7 +15,8 @@ La aplicación compila para producción y supera la revisión estática de estil
 - La revisión ESLint terminó sin errores después de corregir el estado de carga del listado de soporte.
 - La revisión de cambios no detectó errores de formato de parche.
 - Se revisaron los flujos de sesión, el acceso institucional de servicios, los permisos definidos en las migraciones, el almacenamiento privado de capturas, el registro de actividad, las suscripciones en tiempo real y las consultas principales.
-- No se ejecutaron pruebas automatizadas ni simulaciones de tráfico. El proyecto no declara un comando de pruebas automatizadas.
+- Se añadieron y ejecutaron ocho pruebas unitarias con el ejecutor integrado de Node.js. Cubren cálculo de cargos y saldos, selección segura de destinatarios de reglas de cobro, periodos recurrentes, importes monetarios, paginación y recuperación de páginas desde Supabase.
+- No se ejecutó una simulación de tráfico ni una prueba de carga con 800 alumnos.
 
 ## Hallazgos que deben cerrarse antes del lanzamiento
 
@@ -55,15 +56,20 @@ La pantalla permite activar o desactivar registros de dispositivo. Desactivar un
 
 - Corregido el error de ESLint en el estado de carga de tickets de soporte, conservando la indicación de carga al abrir y actualizar la pestaña.
 - Añadida una migración idempotente con índices para consultas de alumnos, membresías, vínculos familiares, años, aulas, matrículas, asistencia, comunicaciones, horarios, reglas y pagos.
+- Añadida paginación reutilizable para directorio, asistencia, comunicaciones, pagos, conceptos y reglas, aulas, cursos, horarios, años escolares y búsqueda de alumnos en los flujos de matrícula, comunicaciones y cobros.
+- El historial de soporte ahora consulta páginas de 25 tickets en el servidor, en vez de devolver un bloque fijo.
+- Las consultas por lotes se centralizaron en una utilidad con páginas de 500 filas y un límite de seguridad de 250,000 filas para evitar recorridos ilimitados.
+- Se optimizó la construcción del directorio de personas mediante índices en memoria y se corrigió la inclusión del año académico en sus datos.
 
 ## Secuencia recomendada para habilitar producción
 
 1. Confirmar el estado de cada migración y aplicarlas en el proyecto Supabase de producción, incluida la nueva migración de índices.
 2. Verificar acceso por perfiles y roles, políticas de seguridad, almacenamiento privado y suscripciones en tiempo real con cuentas de prueba distintas.
 3. Ejecutar una prueba de carga representativa para 800 alumnos y varios administradores concurrentes; registrar tiempos de respuesta, errores, uso de base de datos y tamaño de respuestas.
-4. Limitar los historiales descargados y revisar las recargas de tiempo real que causan actualizaciones masivas.
-5. Cerrar los huecos de auditoría y añadir límites de frecuencia para operaciones sensibles.
-6. Hacer una prueba funcional guiada de alta, edición, invitación, pagos, comunicación, soporte, cambio de contraseña y cierre de cuenta antes de habilitar usuarios reales.
+4. Convertir la recuperación de historiales grandes a consultas por página en el servidor; actualmente varias pantallas presentan páginas en la interfaz, pero reciben primero los conjuntos institucionales en lotes y los mantienen en memoria para cálculos y filtros.
+5. Revisar las recargas de tiempo real que causan actualizaciones masivas.
+6. Cerrar los huecos de auditoría y añadir límites de frecuencia para operaciones sensibles.
+7. Hacer una prueba funcional guiada de alta, edición, invitación, pagos, comunicación, soporte, cambio de contraseña y cierre de cuenta antes de habilitar usuarios reales.
 
 ## Conclusión
 

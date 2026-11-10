@@ -9,6 +9,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import PeopleRegistrationModal from "@/components/people/PeopleRegistrationModal";
 import PersonDetailModal from "@/components/people/PersonDetailModal";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import { usePeopleData } from "@/hooks/useInstitutionData";
 
 import {
@@ -35,6 +37,23 @@ export default function Page() {
     const [notice, setNotice] = useState("");
     const [selectedPersonId, setSelectedPersonId] = useState(null);
     const visibleGuardianLinks = guardian_student_links.filter(link => !["REVOKED", "REJECTED"].includes(link.status));
+    const membershipById = new Map(memberships.map(item => [item.id, item]));
+    const membershipByProfileId = new Map(
+        memberships.filter(item => item.profile_id).map(item => [item.profile_id, item]),
+    );
+    const studentMembershipIds = new Set(students.map(student => student.membership_id).filter(Boolean));
+    const studentsById = new Map(students.map(student => [student.id, student]));
+    const classroomById = new Map(classrooms.map(classroom => [classroom.id, classroom]));
+    const academicYearById = new Map((data.academic_years || []).map(year => [year.id, year]));
+    const activeEnrollmentByStudentId = new Map(
+        enrollments.filter(item => item.status === "ACTIVE").map(item => [item.student_id, item]),
+    );
+    const guardianLinksByProfileId = new Map();
+    visibleGuardianLinks.forEach(link => {
+        const links = guardianLinksByProfileId.get(link.guardian_profile_id) || [];
+        links.push(link);
+        guardianLinksByProfileId.set(link.guardian_profile_id, links);
+    });
 
     // ========================================
     // HELPERS
@@ -116,11 +135,12 @@ export default function Page() {
         // ALUMNOS
 
         students.forEach(student => {
-            const membership = memberships.find(item => item.id === student.membership_id);
+            const membership = membershipById.get(student.membership_id);
             if (membership?.status === "REVOKED" || (student.status === "INACTIVE" && !membership)) return;
             const name = [student.first_names, student.last_names].filter(Boolean).join(" ") || membership?.full_name || "Sin nombre";
-            const enrollment = enrollments.find(item => item.student_id === student.id && item.status === "ACTIVE");
-            const classroom = classrooms.find(item => item.id === enrollment?.classroom_id);
+            const enrollment = activeEnrollmentByStudentId.get(student.id);
+            const classroom = classroomById.get(enrollment?.classroom_id);
+            const academicYear = academicYearById.get(enrollment?.academic_year_id);
 
             result.push({
                 id: `student-${student.id}`,
@@ -142,9 +162,7 @@ export default function Page() {
                 typeLabel: "Alumno",
                 detail: classroom ? `${classroom.grade_label} ${classroom.section_name}` : "Estudiante",
                 classroom: classroom ? `${classroom.grade_label} ${classroom.section_name}` : "No asignada",
-                academicYear: enrollments.find(item => item.student_id === student.id && item.status === "ACTIVE")?.academic_year_id
-                    ? (data.academic_years || []).find(item => item.id === enrollments.find(enrollment => enrollment.student_id === student.id && enrollment.status === "ACTIVE")?.academic_year_id)?.name
-                    : "No asignado",
+                academicYear: academicYear?.name || "No asignado",
             });
         });
 
@@ -153,7 +171,7 @@ export default function Page() {
         memberships.forEach(membership => {
             const role = membership.role;
 
-            if (role === "STUDENT" || membership.status === "REVOKED" || students.some(student => student.membership_id === membership.id)) return;
+            if (role === "STUDENT" || membership.status === "REVOKED" || studentMembershipIds.has(membership.id)) return;
 
             result.push({
                 id: `membership-${membership.id}`,
@@ -175,14 +193,20 @@ export default function Page() {
         const guardianProfileIds = [...new Set(visibleGuardianLinks.map(link => link.guardian_profile_id).filter(Boolean))];
 
         guardianProfileIds.forEach(profileId => {
-            const guardianMembership = memberships.find(item => item.profile_id === profileId);
+            const guardianMembership = membershipByProfileId.get(profileId);
             const guardianProfile = guardian_profiles.find(item => item.id === profileId);
-            const guardianLinks = visibleGuardianLinks.filter(link => link.guardian_profile_id === profileId);
+            const guardianLinks = guardianLinksByProfileId.get(profileId) || [];
 
             result.push({
                 id: `guardian-${profileId}`,
                 profileId,
-                links: guardianLinks.map(link => ({ ...link, studentName: students.find(student => student.id === link.student_id)?.first_names ? `${students.find(student => student.id === link.student_id).first_names} ${students.find(student => student.id === link.student_id).last_names || ""}`.trim() : "Alumno" })),
+                links: guardianLinks.map(link => {
+                    const student = studentsById.get(link.student_id);
+                    const studentName = [student?.first_names, student?.last_names]
+                        .filter(Boolean)
+                        .join(" ");
+                    return { ...link, studentName: studentName || "Alumno" };
+                }),
                 name: guardianMembership?.full_name || guardianProfile?.display_name || "Apoderado",
                 code: guardianMembership?.login_code,
                 email: guardianMembership?.email,
@@ -201,7 +225,7 @@ export default function Page() {
     // CONTADORES
     // ========================================
 
-    const totalStudents = students.filter(student => !memberships.some(membership => membership.id === student.membership_id && membership.status === "REVOKED")).length;
+    const totalStudents = students.filter(student => membershipById.get(student.membership_id)?.status !== "REVOKED").length;
 
     const totalTeachers = memberships.filter(
         item => item.role === "TEACHER" && item.status !== "REVOKED"
@@ -281,6 +305,7 @@ export default function Page() {
 
         return matchesType && matchesSearch;
     });
+    const peoplePagination = usePagination(filteredPeople, 25);
     const selectedPerson = people.find(person => person.id === selectedPersonId) || null;
 
     // ========================================
@@ -342,7 +367,10 @@ export default function Page() {
                             type="search"
                             leftIcon={Search}
                             value={search}
-                            onChange={event => setSearch(event.target.value)}
+                            onChange={event => {
+                                setSearch(event.target.value);
+                                peoplePagination.setPage(1);
+                            }}
                             placeholder="Buscar por nombre, código o correo..."
                             fullWidth
                         />
@@ -359,7 +387,7 @@ export default function Page() {
 
                     <div className="flex items-center gap-sm overflow-x-auto pb-xs">
                         {filters.map(filter => (
-                            <Button key={filter.key} onClick={() => setSelectedType(filter.key)} size="sm" variant={selectedType === filter.key ? "primarySoft" : "outline"} className="people-filter">
+                            <Button key={filter.key} onClick={() => { setSelectedType(filter.key); peoplePagination.setPage(1); }} size="sm" variant={selectedType === filter.key ? "primarySoft" : "outline"} className="people-filter">
                                 {filter.label}{" "}
 
                                 <span className="text-xs">
@@ -407,7 +435,7 @@ export default function Page() {
                                 </thead>
 
                                 <tbody>
-                                    {filteredPeople.map(person => {
+                                    {peoplePagination.items.map(person => {
                                         const status = getStatus(person.status);
 
                                         return (
@@ -497,6 +525,8 @@ export default function Page() {
                                 </tbody>
 
                             </table>
+
+                            <Pagination {...peoplePagination} onPageChange={peoplePagination.setPage} />
 
                         </div>
                     ) : (

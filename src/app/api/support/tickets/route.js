@@ -8,20 +8,29 @@ const attachmentBucket = "support-ticket-attachments";
 
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
 
-export async function GET() {
+export async function GET(request) {
     try {
         const context = await getSupportContext();
         if (context.error) return fail(context.error.message, context.error.status);
 
-        const { data: tickets, error: ticketError } = await context.admin
+        const requestedPage = Number(request.nextUrl.searchParams.get("page") || 1);
+        const pageSize = 25;
+        if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000) {
+            return fail("La página solicitada no es válida.", 400);
+        }
+        const page = requestedPage;
+        const from = (page - 1) * pageSize;
+        const { data: tickets, error: ticketError, count } = await context.admin
             .from("support_tickets")
-            .select("id,category,subject,description,status,created_at,updated_at")
+            .select("id,category,subject,description,status,created_at,updated_at", { count: "exact" })
             .eq("requester_profile_id", context.user.id)
             .order("created_at", { ascending: false })
-            .limit(100);
+            .range(from, from + pageSize - 1);
 
         if (ticketError) return fail(ticketError.message, 400);
-        if (!tickets?.length) return NextResponse.json({ data: [] });
+        if (!tickets?.length) {
+            return NextResponse.json({ data: [], page, pageSize, total: count || 0 });
+        }
 
         const ticketIds = tickets.map(ticket => ticket.id);
         const { data: attachments, error: attachmentError } = await context.admin
@@ -58,6 +67,9 @@ export async function GET() {
                 ...ticket,
                 attachments: attachmentsByTicket.get(ticket.id) || [],
             })),
+            page,
+            pageSize,
+            total: count || 0,
         });
     } catch (error) {
         return fail(error.message || "No se pudieron cargar tus solicitudes.", 500);

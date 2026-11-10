@@ -5,6 +5,8 @@ import { Download, FileSpreadsheet, UserPlus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 import { downloadPeopleWorkbook, parsePeopleWorkbook } from "@/services/people.services";
 
 const initialPerson = {
@@ -39,6 +41,19 @@ export default function PeopleRegistrationModal({ open, onClose, students = [], 
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
     const [parsing, setParsing] = useState(false);
+    const [studentSearch, setStudentSearch] = useState("");
+    const matchingStudents = students.filter(student =>
+        `${student.first_names || ""} ${student.last_names || ""} ${student.student_code || ""}`
+            .toLocaleLowerCase("es-PE")
+            .includes(studentSearch.trim().toLocaleLowerCase("es-PE")),
+    );
+    const studentPagination = usePagination(matchingStudents, 25);
+    const studentOptions = studentPagination.items.some(student => student.id === person.student_id)
+        ? studentPagination.items
+        : [
+            ...students.filter(student => student.id === person.student_id),
+            ...studentPagination.items,
+        ];
 
     const reset = () => {
         setPerson(initialPerson);
@@ -48,6 +63,7 @@ export default function PeopleRegistrationModal({ open, onClose, students = [], 
         setFileName("");
         setError("");
         setParsing(false);
+        setStudentSearch("");
     };
 
     const handleClose = () => {
@@ -167,14 +183,27 @@ export default function PeopleRegistrationModal({ open, onClose, students = [], 
                 <>
                     <Input name="guardian-full-name" label="Nombre completo" value={person.full_name} onChange={event => setPerson(current => ({ ...current, full_name: event.target.value }))} required fullWidth />
                     <Input name="guardian-account-email" label="Correo para la invitación" type="email" autoComplete="email" value={person.email} onChange={event => setPerson(current => ({ ...current, email: event.target.value }))} required fullWidth />
-                    <label className="flex flex-col gap-xs text-sm">
-                        <span className="font-medium">Alumno</span>
-                        <select className="w-full border radius-md bg-surface p-sm" value={person.student_id} onChange={event => setPerson(current => ({ ...current, student_id: event.target.value }))} required>
+                    <div className="flex flex-col gap-xs text-sm">
+                        <label htmlFor="guardian-student-select" className="font-medium">Alumno</label>
+                        <Input
+                            name="guardian-student-search"
+                            aria-label="Buscar alumno para vincular al apoderado"
+                            type="search"
+                            value={studentSearch}
+                            onChange={event => {
+                                setStudentSearch(event.target.value);
+                                studentPagination.setPage(1);
+                            }}
+                            placeholder="Buscar por nombre o código"
+                            fullWidth
+                        />
+                        <select id="guardian-student-select" className="w-full border radius-md bg-surface p-sm" value={person.student_id} onChange={event => setPerson(current => ({ ...current, student_id: event.target.value }))} required>
                             <option value="" disabled>Selecciona un alumno</option>
-                            {students.map(student => <option key={student.id} value={student.id}>{[student.first_names, student.last_names].filter(Boolean).join(" ")}</option>)}
+                            {studentOptions.map(student => <option key={student.id} value={student.id}>{[student.first_names, student.last_names].filter(Boolean).join(" ")}</option>)}
                         </select>
+                        <Pagination {...studentPagination} onPageChange={studentPagination.setPage} />
                         {!students.length && <span className="text-xs text-secondary">Registra primero al alumno.</span>}
-                    </label>
+                    </div>
                     <Input name="guardian-relationship-existing" label="Parentesco" value={person.relationship} onChange={event => setPerson(current => ({ ...current, relationship: event.target.value }))} required fullWidth />
                 </>
             );

@@ -4,6 +4,8 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import Pagination from "@/components/ui/Pagination";
+import usePagination from "@/hooks/usePagination";
 
 const conceptTypes = {
     MATRICULA: "Matrícula",
@@ -116,9 +118,10 @@ function Field({ label, children, helperText }) {
     );
 }
 
-function Select({ name, value, onChange, children, required = false, disabled = false }) {
+function Select({ id, name, value, onChange, children, required = false, disabled = false }) {
     return (
         <select
+            id={id}
             name={name}
             value={value}
             onChange={onChange}
@@ -143,6 +146,8 @@ export default function PaymentActionModal({
     const [form, setForm] = useState(() => getInitialValues(mode, record, data, selectedYearId));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const [studentSearch, setStudentSearch] = useState("");
+    const [feeSearch, setFeeSearch] = useState("");
     const classrooms = (data.classrooms || []).filter(classroom =>
         classroom.academic_year_id === form.academicYearId
         && classroom.status === "ACTIVE",
@@ -168,6 +173,31 @@ export default function PaymentActionModal({
             `${second.last_names} ${second.first_names}`,
             "es",
         ));
+    const matchingStudents = activeStudents.filter(student =>
+        `${student.first_names || ""} ${student.last_names || ""} ${student.student_code || ""}`
+            .toLocaleLowerCase("es-PE")
+            .includes(studentSearch.trim().toLocaleLowerCase("es-PE")),
+    );
+    const studentPagination = usePagination(matchingStudents, 25);
+    const studentOptions = studentPagination.items.some(student => student.id === form.studentId)
+        ? studentPagination.items
+        : [
+            ...activeStudents.filter(student => student.id === form.studentId),
+            ...studentPagination.items,
+        ];
+    const studentById = new Map(activeStudents.map(student => [student.id, student]));
+    const matchingFeeOptions = feeOptions.filter(fee => {
+        const student = studentById.get(fee.student_id);
+        const searchText = `${student?.first_names || ""} ${student?.last_names || ""} ${fee.concept || ""} ${fee.period_label || ""}`;
+        return searchText.toLocaleLowerCase("es-PE").includes(feeSearch.trim().toLocaleLowerCase("es-PE"));
+    });
+    const feePagination = usePagination(matchingFeeOptions, 25);
+    const feeSelectOptions = feePagination.items.some(fee => fee.id === form.studentFeeId)
+        ? feePagination.items
+        : [
+            ...feeOptions.filter(fee => fee.id === form.studentFeeId),
+            ...feePagination.items,
+        ];
 
     const update = event => {
         const { name, value } = event.target;
@@ -345,25 +375,46 @@ export default function PaymentActionModal({
                         )}
 
                         {form.scopeType === "STUDENTS" && (
-                            <Field label="Alumnos" helperText="Usa Ctrl o Cmd para elegir varios.">
-                                <select
-                                    name="studentIds"
-                                    multiple
-                                    value={form.studentIds}
-                                    onChange={event => setForm(current => ({
-                                        ...current,
-                                        studentIds: [...event.target.selectedOptions].map(option => option.value),
-                                    }))}
-                                    className="max-h-36 w-full rounded-lg border bg-white px-md py-sm text-sm"
-                                    required
-                                >
-                                    {activeStudents.map(student => (
-                                        <option key={student.id} value={student.id}>
-                                            {student.last_names}, {student.first_names}
-                                        </option>
+                            <div className="flex flex-col gap-sm text-sm">
+                                <label htmlFor="billing-student-search" className="font-medium">Alumnos</label>
+                                <Input
+                                    id="billing-student-search"
+                                    name="billing-student-search"
+                                    aria-label="Buscar alumnos para la regla"
+                                    type="search"
+                                    value={studentSearch}
+                                    onChange={event => {
+                                        setStudentSearch(event.target.value);
+                                        studentPagination.setPage(1);
+                                    }}
+                                    placeholder="Buscar por nombre o código"
+                                    fullWidth
+                                />
+                                <p className="text-xs text-secondary">
+                                    {form.studentIds.length} alumnos seleccionados
+                                </p>
+                                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                                    {studentPagination.items.map(student => (
+                                        <label key={student.id} className="flex items-center gap-sm border-b px-md py-sm last:border-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={form.studentIds.includes(student.id)}
+                                                onChange={event => setForm(current => ({
+                                                    ...current,
+                                                    studentIds: event.target.checked
+                                                        ? [...new Set([...current.studentIds, student.id])]
+                                                        : current.studentIds.filter(id => id !== student.id),
+                                                }))}
+                                            />
+                                            <span>{student.last_names}, {student.first_names}</span>
+                                        </label>
                                     ))}
-                                </select>
-                            </Field>
+                                    {!matchingStudents.length && (
+                                        <p className="p-md text-xs text-secondary">No hay alumnos que coincidan con la búsqueda.</p>
+                                    )}
+                                </div>
+                                <Pagination {...studentPagination} onPageChange={studentPagination.setPage} />
+                            </div>
                         )}
 
                         <div className="grid grid-cols-2 gap-md">
@@ -417,16 +468,30 @@ export default function PaymentActionModal({
                                 ))}
                             </Select>
                         </Field>
-                        <Field label="Alumno">
-                            <Select name="studentId" value={form.studentId} onChange={update} required>
+                        <div className="flex flex-col gap-xs text-sm font-medium">
+                            <label htmlFor="obligation-student-select">Alumno</label>
+                            <Input
+                                name="obligation-student-search"
+                                aria-label="Buscar alumno para la obligación"
+                                type="search"
+                                value={studentSearch}
+                                onChange={event => {
+                                    setStudentSearch(event.target.value);
+                                    studentPagination.setPage(1);
+                                }}
+                                placeholder="Buscar por nombre o código"
+                                fullWidth
+                            />
+                            <Select id="obligation-student-select" name="studentId" value={form.studentId} onChange={update} required>
                                 <option value="">Selecciona alumno</option>
-                                {activeStudents.map(student => (
+                                {studentOptions.map(student => (
                                     <option key={student.id} value={student.id}>
                                         {student.last_names}, {student.first_names}
                                     </option>
                                 ))}
                             </Select>
-                        </Field>
+                            <Pagination {...studentPagination} onPageChange={studentPagination.setPage} />
+                        </div>
                         <Field label="Concepto">
                             <Select name="feeConceptId" value={form.feeConceptId} onChange={update} required>
                                 <option value="">Selecciona concepto</option>
@@ -445,11 +510,24 @@ export default function PaymentActionModal({
 
                 {mode === "payment" && (
                     <>
-                        <Field label="Obligación">
-                            <Select name="studentFeeId" value={form.studentFeeId} onChange={update} required>
+                        <div className="flex flex-col gap-xs text-sm font-medium">
+                            <label htmlFor="payment-fee-select">Obligación</label>
+                            <Input
+                                name="payment-fee-search"
+                                aria-label="Buscar obligación por alumno o concepto"
+                                type="search"
+                                value={feeSearch}
+                                onChange={event => {
+                                    setFeeSearch(event.target.value);
+                                    feePagination.setPage(1);
+                                }}
+                                placeholder="Buscar alumno, concepto o periodo"
+                                fullWidth
+                            />
+                            <Select id="payment-fee-select" name="studentFeeId" value={form.studentFeeId} onChange={update} required>
                                 <option value="">Selecciona obligación pendiente</option>
-                                {feeOptions.map(fee => {
-                                    const student = activeStudents.find(item => item.id === fee.student_id);
+                                {feeSelectOptions.map(fee => {
+                                    const student = studentById.get(fee.student_id);
                                     const balance = Number(fee.amount) - Number(fee.paid_amount || 0);
                                     return (
                                         <option key={fee.id} value={fee.id}>
@@ -459,7 +537,11 @@ export default function PaymentActionModal({
                                     );
                                 })}
                             </Select>
-                        </Field>
+                            <Pagination {...feePagination} onPageChange={feePagination.setPage} />
+                            {!matchingFeeOptions.length && (
+                                <span className="text-xs text-secondary">No hay obligaciones que coincidan con la búsqueda.</span>
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-md">
                             <Input name="amount" label={`Importe recibido (${currency})`} type="number" min="0.01" step="0.01" value={form.amount} onChange={update} required fullWidth />
                             <Input name="paidAt" label="Fecha y hora del pago" type="datetime-local" value={form.paidAt} onChange={update} required fullWidth />

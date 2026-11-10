@@ -88,11 +88,16 @@ export async function createSupportTicket(values, attachments = []) {
     return ticket;
 }
 
-export async function getSupportTickets() {
-    const response = await fetch("/api/support/tickets", {
+export async function getSupportTickets(page = 1) {
+    const response = await fetch(`/api/support/tickets?page=${encodeURIComponent(page)}`, {
         method: "GET",
         cache: "no-store",
     });
     const result = await getResponseData(response);
-    return result.data || [];
+    return {
+        tickets: result.data || [],
+        page: result.page || page,
+        pageSize: result.pageSize || 25,
+        total: result.total || 0,
+    };
 }

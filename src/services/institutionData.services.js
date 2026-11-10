@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllPages } from "@/lib/pagination.mjs";
 
 const PAGE_SIZE = 500;
 const STUDENT_COLUMNS = "id,institution_id,membership_id,first_names,last_names,phone,email,student_code,status,created_at";
@@ -6,20 +7,13 @@ const STUDENT_COLUMNS = "id,institution_id,membership_id,first_names,last_names,
 async function selectByInstitution(table, institutionId, { columns = "*", orderBy = "created_at", ascending = false } = {}) {
     if (!institutionId) return [];
     const supabase = createClient();
-    const rows = [];
-    let from = 0;
-
-    while (true) {
+    return fetchAllPages(async ({ from, to }) => {
         let query = supabase.from(table).select(columns).eq("institution_id", institutionId);
         if (orderBy) query = query.order(orderBy, { ascending });
-        const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
-        if (error) throw new Error(`No se pudieron cargar ${table}: ${error.message}`);
-        rows.push(...(data ?? []));
-        if (!data || data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-    }
-
-    return rows;
+        return query.range(from, to);
+    }, { pageSize: PAGE_SIZE }).catch(error => {
+        throw new Error(`No se pudieron cargar ${table}: ${error.message}`);
+    });
 }
 
 async function loadTables(institutionId, tables) {
@@ -79,6 +73,7 @@ export async function getPeopleData(institutionId) {
         ["guardian_student_links", "guardian_student_links"],
         ["enrollments", "enrollments"],
         ["classrooms", "classrooms"],
+        ["academic_years", "academic_years", { orderBy: "starts_on", ascending: false }],
     ]);
     const guardianIds = [...new Set(data.guardian_student_links.map(link => link.guardian_profile_id).filter(Boolean))];
     if (!guardianIds.length) return { ...data, guardian_profiles: [] };

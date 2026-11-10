@@ -22,6 +22,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
+import Pagination from "@/components/ui/Pagination";
 import Switch from "@/components/ui/Switch";
 import { legalDocuments } from "@/constants/legalDocuments";
 import { useAuth } from "@/context/AuthContext";
@@ -189,6 +190,8 @@ export default function Page() {
     const [legalDocument, setLegalDocument] = useState(null);
     const [supportOpen, setSupportOpen] = useState(false);
     const [supportTickets, setSupportTickets] = useState([]);
+    const [supportTicketPage, setSupportTicketPage] = useState(1);
+    const [supportTicketTotal, setSupportTicketTotal] = useState(0);
     const [supportLoading, setSupportLoading] = useState(true);
     const [supportError, setSupportError] = useState("");
     const [supportRefreshKey, setSupportRefreshKey] = useState(0);
@@ -204,9 +207,12 @@ export default function Page() {
             if (!active) return;
             setSupportLoading(true);
             setSupportError("");
-            getSupportTickets()
-                .then(tickets => {
-                    if (active) setSupportTickets(tickets);
+            getSupportTickets(supportTicketPage)
+                .then(result => {
+                    if (active) {
+                        setSupportTickets(result.tickets);
+                        setSupportTicketTotal(result.total);
+                    }
                 })
                 .catch(loadError => {
                     if (active) setSupportError(loadError.message || "No se pudieron cargar tus tickets.");
@@ -219,9 +225,12 @@ export default function Page() {
         const refreshTickets = () => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                getSupportTickets()
-                    .then(tickets => {
-                        if (active) setSupportTickets(tickets);
+                getSupportTickets(supportTicketPage)
+                    .then(result => {
+                        if (active) {
+                            setSupportTickets(result.tickets);
+                            setSupportTicketTotal(result.total);
+                        }
                     })
                     .catch(loadError => {
                         if (active) setSupportError(loadError.message || "No se pudieron cargar tus tickets.");
@@ -261,7 +270,7 @@ export default function Page() {
             clearTimeout(debounceTimer);
             supabase.removeChannel(channel);
         };
-    }, [activeTab, user?.id, supportRefreshKey]);
+    }, [activeTab, user?.id, supportRefreshKey, supportTicketPage]);
 
     useEffect(() => {
         if (!user?.id) return undefined;
@@ -765,6 +774,14 @@ export default function Page() {
                                     </div>
                                 </Card>
                             ))}
+                            <Pagination
+                                page={supportTicketPage}
+                                pageCount={Math.max(1, Math.ceil(supportTicketTotal / 25))}
+                                from={supportTicketTotal ? (supportTicketPage - 1) * 25 + 1 : 0}
+                                to={Math.min(supportTicketPage * 25, supportTicketTotal)}
+                                total={supportTicketTotal}
+                                onPageChange={setSupportTicketPage}
+                            />
                         </section>
                     ) : (
                         <Card variant="default" title="Aún no tienes tickets">
@@ -792,7 +809,10 @@ export default function Page() {
                 open={supportOpen}
                 institutionId={currentInstitution?.id}
                 onClose={() => setSupportOpen(false)}
-                onCreated={() => setSupportRefreshKey(value => value + 1)}
+                onCreated={() => {
+                    setSupportTicketPage(1);
+                    setSupportRefreshKey(value => value + 1);
+                }}
             />
 
             <LegalDocumentModal
