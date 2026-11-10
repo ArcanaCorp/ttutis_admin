@@ -10,10 +10,11 @@ import Modal from "@/components/ui/Modal";
 import { useClassesSchedulesData } from "@/hooks/useInstitutionData";
 import {
     BookOpen, CalendarDays, Users, GraduationCap, Clock3, Search,
-    Plus, ChevronDown, MoreHorizontal, Pencil, Trash2, Filter,
-    LayoutGrid, List, CalendarRange, UserRound, DoorOpen, BookMarked,
-    Info, Check
+    Plus, ChevronDown, Pencil, Trash2, Filter, FileSpreadsheet,
+    LayoutGrid, CalendarRange, UserRound, DoorOpen, BookMarked,
+    Info
 } from "lucide-react";
+import AcademicRecordModal from "@/components/academic/AcademicRecordModal";
 
 const levelLabels = {
     INITIAL: "Inicial",
@@ -35,7 +36,7 @@ const weekdays = [
 const cx = (...classes) => classes.filter(Boolean).join(" ");
 
 export default function Page() {
-    const { data = {}, loading, error, refresh } = useClassesSchedulesData();
+    const { data = {}, loading, error, refresh, canManage, createRecords, updateRecord, deleteRecord } = useClassesSchedulesData();
     const [selectedAcademicYearId, setSelectedAcademicYearId] = useState("");
     const [activeTab, setActiveTab] = useState("classrooms");
     const [selectedLevel, setSelectedLevel] = useState("ALL");
@@ -43,6 +44,9 @@ export default function Page() {
     const [selectedClassroomId, setSelectedClassroomId] = useState("");
     const [selectedDay, setSelectedDay] = useState(1);
     const [showForm, setShowForm] = useState(false);
+    const [recordForm, setRecordForm] = useState({ open: false, kind: "classroom", record: null });
+    const [actionError, setActionError] = useState("");
+    const [actionNotice, setActionNotice] = useState("");
 
     const academicYears = data.academic_years || [];
     const classrooms = data.classrooms || [];
@@ -157,10 +161,36 @@ export default function Page() {
     ];
 
     const openCreate = () => setShowForm(true);
+    const openRecordForm = (kind, record = null) => {
+        setActionError("");
+        setActionNotice("");
+        setRecordForm({ open: true, kind, record });
+    };
+    const saveAcademicRecord = async (kind, values, id) => {
+        if (id) await updateRecord(kind, id, values);
+        else await createRecords(kind, values);
+        setActionNotice("Los cambios se guardaron correctamente.");
+    };
+    const removeAcademicRecord = async (kind, record, label) => {
+        if (!window.confirm(`¿Eliminar ${label}? Esta acción no se puede deshacer.`)) return;
+        setActionError("");
+        setActionNotice("");
+        try {
+            await deleteRecord(kind, record.id);
+            setActionNotice("El registro se eliminó correctamente.");
+        } catch (deleteError) {
+            setActionError(deleteError.message || "No se pudo eliminar el registro.");
+        }
+    };
+    const startCreation = kind => {
+        setShowForm(false);
+        openRecordForm(kind);
+    };
 
     return (
         <div className="page-shell">
             <ResourceStatus loading={loading} error={error} onRetry={refresh} />
+            {(actionError || actionNotice) && <div className={cx("rounded-lg border p-3 text-sm", actionError ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-800")} role={actionError ? "alert" : "status"}>{actionError || actionNotice}</div>}
             <PageHeader
                 title="Clases y horarios"
                 eyebrow="Gestión académica"
@@ -183,7 +213,7 @@ export default function Page() {
                         </select>
                         <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500" />
                     </label>
-                    <Button onClick={openCreate} variant="secondary" icon={Plus}>Nueva configuración</Button>
+                    <Button onClick={openCreate} variant="secondary" icon={Plus} disabled={!canManage} title={!canManage ? "Requiere una membresía administradora activa" : undefined}>Nueva configuración</Button>
                     </>
                 )}
             />
@@ -235,7 +265,7 @@ export default function Page() {
                             <h2 className="text-lg font-semibold">Aulas y secciones</h2>
                             <p className="text-sm text-gray-500">Administra los niveles, grados y secciones del colegio.</p>
                         </div>
-                        <Button size="sm" variant="outline" onClick={openCreate} icon={Plus}>Agregar aula</Button>
+                        <div className="flex gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("classroom")} disabled={!canManage}>Importar aulas</Button><Button size="sm" variant="outline" onClick={() => openRecordForm("classroom")} icon={Plus} disabled={!canManage}>Agregar aula</Button></div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-sm">
@@ -276,7 +306,10 @@ export default function Page() {
                                             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                                                 <GraduationCap size={20} />
                                             </div>
-                                            <MoreHorizontal size={19} className="text-gray-400" />
+                                            <div className="flex gap-xs" onClick={event => event.stopPropagation()}>
+                                                <Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel="Editar aula" onClick={() => openRecordForm("classroom", classroom)} disabled={!canManage} />
+                                                <Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel="Eliminar aula" onClick={() => removeAcademicRecord("classroom", classroom, `el aula ${getClassroomName(classroom)}`)} disabled={!canManage || enrollments.some(item => item.classroom_id === classroom.id) || assignments.some(item => item.classroom_id === classroom.id)} title={enrollments.some(item => item.classroom_id === classroom.id) || assignments.some(item => item.classroom_id === classroom.id) ? "Elimina primero matrículas y asignaciones vinculadas" : "Eliminar aula"} />
+                                            </div>
                                         </div>
                                         <p className="text-xs text-gray-500 mt-4">{levelLabels[classroom.level] || classroom.level}</p>
                                         <h3 className="text-lg font-semibold mt-1">{getClassroomName(classroom)}</h3>
@@ -310,8 +343,15 @@ export default function Page() {
                             <h2 className="text-lg font-semibold">Cursos y profesores</h2>
                             <p className="text-sm text-gray-500">Consulta qué cursos se dictan en cada aula y quién está a cargo.</p>
                         </div>
-                        <Button size="sm" variant="outline" onClick={openCreate} icon={Plus}>Asignar curso</Button>
+                        <div className="flex flex-wrap gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("assignment")} disabled={!canManage}>Importar asignaciones</Button><Button size="sm" variant="outline" icon={Plus} onClick={() => openRecordForm("subject")} disabled={!canManage}>Nuevo curso</Button><Button size="sm" variant="outline" onClick={() => openRecordForm("assignment")} icon={Plus} disabled={!canManage}>Asignar curso</Button></div>
                     </div>
+
+                    <Card variant="default" title="Catálogo de cursos" subtitle="Cursos disponibles para asignar en el año escolar." icon={BookMarked} iconVariant="primary">
+                        <div className="flex flex-col gap-sm">
+                            <div className="flex justify-end gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("subject")} disabled={!canManage}>Importar cursos</Button><Button size="sm" variant="outline" icon={Plus} onClick={() => openRecordForm("subject")} disabled={!canManage}>Nuevo curso</Button></div>
+                            {subjects.length ? subjects.map(subject => <div key={subject.id} className="flex items-center justify-between gap-md border-t py-sm"><div className="min-w-0"><p className="truncate text-sm font-medium">{subject.name}</p><p className="text-xs text-gray-500">{subject.code || "Sin código"}{subject.description ? ` · ${subject.description}` : ""}</p></div><div className="flex gap-xs"><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel={`Editar curso ${subject.name}`} onClick={() => openRecordForm("subject", subject)} disabled={!canManage}/><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel={`Eliminar curso ${subject.name}`} onClick={() => removeAcademicRecord("subject", subject, `el curso ${subject.name}`)} disabled={!canManage || assignments.some(item => item.subject_id === subject.id)} title={assignments.some(item => item.subject_id === subject.id) ? "Elimina primero las asignaciones asociadas" : "Eliminar curso"}/></div></div>) : <p className="border-t py-md text-sm text-gray-500">Todavía no hay cursos. Registra uno o importa una lista desde Excel.</p>}
+                        </div>
+                    </Card>
 
                     <div className="flex flex-col sm:flex-row gap-md">
                         <div className="sm:w-64">
@@ -340,7 +380,7 @@ export default function Page() {
                     {classroomAssignments.length ? (
                         <div className="border rounded-xl overflow-hidden">
                             <div className="grid grid-cols-[1.2fr_1fr_auto] gap-md bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                <span>Curso</span><span>Profesor responsable</span><span>Estado</span>
+                                <span>Curso</span><span>Profesor responsable</span><span>Acciones</span>
                             </div>
                             {classroomAssignments.map(assignment => (
                                 <div key={assignment.id} className="grid grid-cols-[1.2fr_1fr_auto] gap-md items-center px-4 py-4 border-t">
@@ -359,7 +399,7 @@ export default function Page() {
                                         </div>
                                         <span className="text-sm truncate">{getTeacher(assignment.teacher_membership_id)}</span>
                                     </div>
-                                    <span className="text-xs rounded-full bg-green-50 text-green-700 px-2.5 py-1">Asignado</span>
+                                    <div className="flex items-center gap-xs"><span className="text-xs rounded-full bg-green-50 text-green-700 px-2.5 py-1">Asignado</span><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel="Editar asignación" onClick={() => openRecordForm("assignment", assignment)} disabled={!canManage} /><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel="Eliminar asignación" onClick={() => removeAcademicRecord("assignment", assignment, `la asignación de ${getSubject(assignment.subject_id)}`)} disabled={!canManage || schedules.some(item => item.course_assignment_id === assignment.id)} title={schedules.some(item => item.course_assignment_id === assignment.id) ? "Elimina primero los horarios asociados" : "Eliminar asignación"} /></div>
                                 </div>
                             ))}
                         </div>
@@ -381,7 +421,7 @@ export default function Page() {
                             <h2 className="text-lg font-semibold">Horarios de clase</h2>
                             <p className="text-sm text-gray-500">Revisa la distribución semanal de cursos por aula.</p>
                         </div>
-                        <Button size="sm" variant="outline" onClick={openCreate} icon={Plus}>Agregar horario</Button>
+                        <div className="flex gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("schedule")} disabled={!canManage}>Importar horarios</Button><Button size="sm" variant="outline" onClick={() => openRecordForm("schedule")} icon={Plus} disabled={!canManage}>Agregar horario</Button></div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-md">
@@ -435,9 +475,7 @@ export default function Page() {
                                                 <p className="text-sm font-semibold">{getSubject(assignment?.subject_id)}</p>
                                                 <p className="text-xs text-gray-500 mt-1">{getTeacher(assignment?.teacher_membership_id)}</p>
                                             </div>
-                                            <span className="text-xs text-gray-500 inline-flex items-center gap-xs">
-                                                <DoorOpen size={14} /> {schedule.classroom_label || "Aula por definir"}
-                                            </span>
+                                            <div className="flex items-center gap-sm"><span className="text-xs text-gray-500 inline-flex items-center gap-xs"><DoorOpen size={14} /> {schedule.classroom_label || "Aula por definir"}</span><Button size="xs" variant="ghost" icon={Pencil} iconOnly accessibilityLabel="Editar horario" onClick={() => openRecordForm("schedule", schedule)} disabled={!canManage} /><Button size="xs" variant="ghost" icon={Trash2} iconOnly accessibilityLabel="Eliminar horario" onClick={() => removeAcademicRecord("schedule", schedule, "el horario")} disabled={!canManage} /></div>
                                         </div>
                                     );
                                 })}
@@ -474,9 +512,9 @@ export default function Page() {
             >
                 <div className="grid gap-sm">
                     {[
-                        { tab: "classrooms", title: "Crear aula o sección", description: "Registra un nivel, grado y sección.", icon: DoorOpen },
-                        { tab: "courses", title: "Asignar curso y profesor", description: "Vincula un curso con un aula y docente.", icon: BookOpen },
-                        { tab: "schedules", title: "Configurar horario", description: "Programa el día y la hora de una clase.", icon: Clock3 },
+                        { tab: "classrooms", kind: "classroom", title: "Crear aula o sección", description: "Registra un nivel, grado y sección.", icon: DoorOpen },
+                        { tab: "courses", kind: "assignment", title: "Asignar curso y profesor", description: "Vincula un curso con un aula y docente.", icon: BookOpen },
+                        { tab: "schedules", kind: "schedule", title: "Configurar horario", description: "Programa el día y la hora de una clase.", icon: Clock3 },
                     ].map(option => {
                         const Icon = option.icon;
                         return (
@@ -484,7 +522,7 @@ export default function Page() {
                                 key={option.tab}
                                 onClick={() => {
                                     setActiveTab(option.tab);
-                                    setShowForm(false);
+                                    startCreation(option.kind);
                                 }}
                                 variant="ghost"
                                 fullWidth
@@ -503,6 +541,15 @@ export default function Page() {
                     })}
                 </div>
             </Modal>
+            <AcademicRecordModal
+                open={recordForm.open}
+                onClose={() => setRecordForm(current => ({ ...current, open: false }))}
+                kind={recordForm.kind}
+                record={recordForm.record}
+                yearId={academicYearId}
+                data={data}
+                onSave={saveAcademicRecord}
+            />
             
         </div>
     );

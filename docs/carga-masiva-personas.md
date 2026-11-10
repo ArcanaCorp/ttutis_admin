@@ -4,11 +4,11 @@ En **Personas → Registrar persona** se puede registrar una persona de manera m
 
 ## Registro manual
 
-- **Alumno:** crea el perfil de alumno, su membresía de institución y envía una invitación a su correo. Si se agrega un apoderado, también crea su cuenta e inicia el vínculo con el alumno.
-- **Docente y auxiliar:** crea una membresía con el rol correspondiente y envía una invitación al correo.
+- **Alumno:** crea el perfil de alumno y su membresía de institución. Si se agrega un apoderado, también crea o reutiliza su cuenta e inicia el vínculo con el alumno.
+- **Docente y auxiliar:** crea una membresía con el rol correspondiente.
 - **Apoderado:** crea o reutiliza su cuenta e inicia un vínculo pendiente con el alumno seleccionado.
 
-Las invitaciones usan el enlace de activación de Supabase Auth; cada destinatario define su contraseña. El correo del alumno, docente, auxiliar y apoderado debe ser real y accesible. Las cuentas que ya existen se reutilizan y no reciben una segunda invitación.
+Desde el detalle de una persona, el botón **Invitar** envía por Resend la plantilla publicada `invitacion-ttutis`, con el código de acceso, una contraseña temporal y la dirección de inicio de sesión. La plantilla recibe `USER_NAME`, `INSTITUTION_NAME`, `ACCOUNT_TYPE`, `ACCESS_CODE`, `TEMP_PASSWORD` y `LOGIN_URL`. Al volver a invitar, se genera una nueva contraseña temporal para la cuenta. La clave `RESEND_API_KEY` debe mantenerse solo en el servidor. La plantilla debe estar publicada y tener remitente y asunto configurados; también puede definirse `RESEND_INVITATION_TEMPLATE_ID` si se prefiere usar el ID en lugar del alias.
 
 ## Excel
 

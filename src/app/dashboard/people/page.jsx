@@ -7,6 +7,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
 import PeopleRegistrationModal from "@/components/people/PeopleRegistrationModal";
+import PersonDetailModal from "@/components/people/PersonDetailModal";
 import ResourceStatus from "@/components/ui/ResourceStatus";
 import { usePeopleData } from "@/hooks/useInstitutionData";
 
@@ -25,13 +26,15 @@ import {
 } from "lucide-react";
 
 export default function Page() {
-    const { data = {}, loading, error, refresh, canManage, createPeople } = usePeopleData();
+    const { data = {}, loading, error, refresh, canManage, createPeople, actOnPerson, currentInstitution } = usePeopleData();
     const { memberships = [], students = [], guardian_student_links = [], guardian_profiles = [], enrollments = [], classrooms = [] } = data;
 
     const [search, setSearch] = useState("");
     const [selectedType, setSelectedType] = useState("ALL");
     const [showRegistration, setShowRegistration] = useState(false);
     const [notice, setNotice] = useState("");
+    const [selectedPersonId, setSelectedPersonId] = useState(null);
+    const visibleGuardianLinks = guardian_student_links.filter(link => !["REVOKED", "REJECTED"].includes(link.status));
 
     // ========================================
     // HELPERS
@@ -114,12 +117,22 @@ export default function Page() {
 
         students.forEach(student => {
             const membership = memberships.find(item => item.id === student.membership_id);
+            if (membership?.status === "REVOKED" || (student.status === "INACTIVE" && !membership)) return;
             const name = [student.first_names, student.last_names].filter(Boolean).join(" ") || membership?.full_name || "Sin nombre";
             const enrollment = enrollments.find(item => item.student_id === student.id && item.status === "ACTIVE");
             const classroom = classrooms.find(item => item.id === enrollment?.classroom_id);
 
             result.push({
                 id: `student-${student.id}`,
+                studentId: student.id,
+                membershipId: membership?.id,
+                profileId: membership?.profile_id,
+                first_names: student.first_names,
+                last_names: student.last_names,
+                document_type: student.document_type,
+                document_number: student.document_number,
+                birth_date: student.birth_date,
+                admission_date: student.admission_date,
                 name,
                 code: student.student_code,
                 email: student.email || membership?.email,
@@ -128,6 +141,10 @@ export default function Page() {
                 type: "STUDENT",
                 typeLabel: "Alumno",
                 detail: classroom ? `${classroom.grade_label} ${classroom.section_name}` : "Estudiante",
+                classroom: classroom ? `${classroom.grade_label} ${classroom.section_name}` : "No asignada",
+                academicYear: enrollments.find(item => item.student_id === student.id && item.status === "ACTIVE")?.academic_year_id
+                    ? (data.academic_years || []).find(item => item.id === enrollments.find(enrollment => enrollment.student_id === student.id && enrollment.status === "ACTIVE")?.academic_year_id)?.name
+                    : "No asignado",
             });
         });
 
@@ -136,10 +153,11 @@ export default function Page() {
         memberships.forEach(membership => {
             const role = membership.role;
 
-            if (role === "STUDENT" || students.some(student => student.membership_id === membership.id)) return;
+            if (role === "STUDENT" || membership.status === "REVOKED" || students.some(student => student.membership_id === membership.id)) return;
 
             result.push({
                 id: `membership-${membership.id}`,
+                membershipId: membership.id,
                 profileId: membership.profile_id,
                 name: membership.full_name,
                 code: membership.login_code,
@@ -154,16 +172,17 @@ export default function Page() {
 
         // APODERADOS
 
-        const guardianProfileIds = [...new Set(guardian_student_links.map(link => link.guardian_profile_id).filter(Boolean))];
+        const guardianProfileIds = [...new Set(visibleGuardianLinks.map(link => link.guardian_profile_id).filter(Boolean))];
 
         guardianProfileIds.forEach(profileId => {
             const guardianMembership = memberships.find(item => item.profile_id === profileId);
             const guardianProfile = guardian_profiles.find(item => item.id === profileId);
-            const guardianLinks = guardian_student_links.filter(link => link.guardian_profile_id === profileId);
+            const guardianLinks = visibleGuardianLinks.filter(link => link.guardian_profile_id === profileId);
 
             result.push({
                 id: `guardian-${profileId}`,
                 profileId,
+                links: guardianLinks.map(link => ({ ...link, studentName: students.find(student => student.id === link.student_id)?.first_names ? `${students.find(student => student.id === link.student_id).first_names} ${students.find(student => student.id === link.student_id).last_names || ""}`.trim() : "Alumno" })),
                 name: guardianMembership?.full_name || guardianProfile?.display_name || "Apoderado",
                 code: guardianMembership?.login_code,
                 email: guardianMembership?.email,
@@ -175,25 +194,25 @@ export default function Page() {
             });
         });
 
-        return result;
+        return result.map(person => ({ ...person, institutionId: currentInstitution?.id, statusLabel: getStatus(person.status).label }));
     })();
 
     // ========================================
     // CONTADORES
     // ========================================
 
-    const totalStudents = students.length;
+    const totalStudents = students.filter(student => !memberships.some(membership => membership.id === student.membership_id && membership.status === "REVOKED")).length;
 
     const totalTeachers = memberships.filter(
-        item => item.role === "TEACHER"
+        item => item.role === "TEACHER" && item.status !== "REVOKED"
     ).length;
 
     const totalAssistants = memberships.filter(
-        item => item.role === "ASSISTANT"
+        item => item.role === "ASSISTANT" && item.status !== "REVOKED"
     ).length;
 
     const totalGuardians = new Set(
-        guardian_student_links.map(link => link.guardian_profile_id).filter(Boolean)
+        visibleGuardianLinks.map(link => link.guardian_profile_id).filter(Boolean)
     ).size;
 
     const stats = [
@@ -262,6 +281,7 @@ export default function Page() {
 
         return matchesType && matchesSearch;
     });
+    const selectedPerson = people.find(person => person.id === selectedPersonId) || null;
 
     // ========================================
     // RENDER
@@ -468,7 +488,7 @@ export default function Page() {
                                                 {/* ACTION */}
 
                                                 <td className="p-md">
-                                                    <Button variant="ghost" icon={ChevronRight} iconOnly accessibilityLabel={`Ver persona: ${person.name}`} />
+                                                    <Button variant="ghost" icon={ChevronRight} iconOnly accessibilityLabel={`Ver persona: ${person.name}`} onClick={() => setSelectedPersonId(person.id)} />
                                                 </td>
 
                                             </tr>
@@ -517,6 +537,16 @@ export default function Page() {
                     setNotice(`Registro completado: ${counts || "personas actualizadas"}.${invites}`);
                     return result;
                 }}
+            />
+            <PersonDetailModal
+                key={selectedPerson?.id || "closed"}
+                open={Boolean(selectedPerson)}
+                person={selectedPerson}
+                canManage={canManage}
+                onClose={() => setSelectedPersonId(null)}
+                onInvite={person => actOnPerson("invite", person)}
+                onSave={(person, values) => actOnPerson("edit", person, values)}
+                onDelete={person => actOnPerson("delete", person)}
             />
 
         </div>

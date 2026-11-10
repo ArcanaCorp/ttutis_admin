@@ -2,6 +2,10 @@
 
 Documentos de apoyo para configurar y operar el panel.
 
+## Clases y horarios
+
+- [Guía para cargar aulas, cursos, asignaciones y horarios desde Excel](./carga-masiva-clases-horarios.md)
+
 ## Importación de aulas
 
 - [Guía para cargar aulas desde Excel](./carga-masiva-aulas.md)

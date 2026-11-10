@@ -44,13 +44,13 @@ La importación de aulas procesa la primera hoja del archivo y valida sus campos
 
 Reúne alumnos, docentes, auxiliares y apoderados, con búsqueda y datos vinculados a la institución. El registro puede hacerse persona por persona o mediante una plantilla Excel. Al registrar alumnos, se guardan sus datos y membresía; también se pueden registrar trabajadores y establecer vínculos de apoderado con alumnos.
 
-El flujo de invitación usa el correo de acceso para que cada persona active su cuenta. Si la cuenta ya existe, se reutiliza. Los vínculos con apoderados pueden quedar pendientes de confirmación. La carga masiva admite hasta 500 personas, 1,000 vínculos y archivos de hasta 5 MB. Los requisitos y las hojas esperadas se encuentran en la [guía de registro de personas](docs/carga-masiva-personas.md).
+Desde el detalle de cada persona, el administrador puede enviar por correo el código de acceso y una contraseña temporal. Los vínculos con apoderados pueden quedar pendientes de confirmación. La carga masiva admite hasta 500 personas, 1,000 vínculos y archivos de hasta 5 MB. Los requisitos y las hojas esperadas se encuentran en la [guía de registro de personas](docs/carga-masiva-personas.md).
 
 ### Clases y horarios
 
-Permite explorar aulas por año escolar y nivel, además de consultar cursos asignados, profesores y bloques de horario que ya estén registrados. Incluye vistas de aulas, cursos y horarios, con búsqueda y filtros.
+Permite explorar aulas por año escolar y nivel, administrar el catálogo de cursos, asignar docentes a cursos en aulas y configurar bloques semanales. Los administradores activos pueden crear, editar y eliminar aulas, cursos, asignaciones y horarios. Se validan duplicados, relaciones necesarias y cruces de horario; los registros con dependencias no se pueden eliminar antes de retirar sus vínculos.
 
-En el estado actual del repositorio, la pantalla muestra controles de creación o edición, pero no se encontró una operación conectada para guardar asignaciones de cursos, profesores ni horarios desde esta sección. La gestión efectiva de esos registros requiere trabajo adicional.
+La sección admite carga manual o masiva desde Excel para las cuatro categorías. Cada importación valida las filas antes de guardar y ofrece una plantilla descargable. Los formatos y reglas están en la [guía de carga de clases y horarios](docs/carga-masiva-clases-horarios.md).
 
 ### Asistencia
 

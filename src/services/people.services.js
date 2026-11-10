@@ -160,6 +160,30 @@ export async function registerPeople(payload) {
     return result;
 }
 
+export async function managePerson(action, person, values) {
+    const response = await fetch(`/api/dashboard/people/${encodeURIComponent(person.id)}`, {
+        method: action === "invite" ? "POST" : action === "delete" ? "DELETE" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, institutionId: person.institutionId, type: person.type, studentId: person.studentId, membershipId: person.membershipId, profileId: person.profileId, values }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "No se pudo completar la acción.");
+    return result;
+}
+
+export async function getPersonDetails(person) {
+    const query = new URLSearchParams({ type: person.type, institutionId: person.institutionId });
+    if (person.studentId) query.set("studentId", person.studentId);
+    if (person.membershipId) query.set("membershipId", person.membershipId);
+    if (person.profileId) query.set("profileId", person.profileId);
+    const response = await fetch(`/api/dashboard/people/${encodeURIComponent(person.id)}?${query}`);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "No se pudo cargar el detalle de la persona.");
+    if (person.type === "STUDENT") return { ...person, ...result, name: `${result.first_names} ${result.last_names}`.trim(), email: result.accountEmail || result.email, code: result.student_code, classroom: result.enrollments?.find(row => row.status === "ACTIVE")?.classroom ? `${result.enrollments.find(row => row.status === "ACTIVE").classroom.grade_label} ${result.enrollments.find(row => row.status === "ACTIVE").classroom.section_name}` : "No asignada", academicYear: result.enrollments?.find(row => row.status === "ACTIVE")?.yearName || "No asignado", links: result.guardianLinks || [] };
+    if (person.type === "GUARDIAN") return { ...person, ...result, name: result.display_name || person.name, links: (result.links || []).map(link => ({ ...link, studentName: link.student ? `${link.student.first_names} ${link.student.last_names}`.trim() : "Alumno" })) };
+    return { ...person, ...result, name: result.full_name, code: result.login_code };
+}
+
 export async function downloadPeopleWorkbook(filename = "plantilla-personas.xlsx", sample = false) {
     const { utils, writeFileXLSX } = await import("xlsx");
     const workbook = utils.book_new();
