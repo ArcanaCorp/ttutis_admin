@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useProfile } from "@/context/ProfileContext";
 import { getInstitutionLogoUrl } from "@/services/institutionLogo.services";
 import { Headset } from "lucide-react";
+import SupportModal from "@/components/support/SupportModal";
 
 export default function Navbar () {
     const pathname = usePathname();
@@ -19,6 +20,7 @@ export default function Navbar () {
     const { currentInstitution, loading: profileLoading } = useProfile();
     const [signingOut, setSigningOut] = useState(false);
     const [signOutError, setSignOutError] = useState("");
+    const [supportOpen, setSupportOpen] = useState(false);
     const institutionName = currentInstitution?.trade_name || currentInstitution?.legal_name || "Tu colegio";
     const institutionLogoUrl = getInstitutionLogoUrl(currentInstitution?.id, currentInstitution?.logo_path);
 
@@ -68,10 +70,22 @@ export default function Navbar () {
                 </ul>
             </div>
             <div className="flex flex-col gap-sm">
-                <Button icon={Headset} variant="outline" fullWidth>Soporte</Button>
+                <Button
+                    icon={Headset}
+                    variant="outline"
+                    fullWidth
+                    onClick={() => setSupportOpen(true)}
+                >
+                    Soporte
+                </Button>
                 {signOutError && <p className="text-xs text-error" role="alert">{signOutError}</p>}
                 <Button variant="dangerSoft" fullWidth loading={signingOut} loadingText="Cerrando sesión…" onClick={handleSignOut}>Cerrar sesión</Button>
             </div>
+            <SupportModal
+                open={supportOpen}
+                institutionId={currentInstitution?.id}
+                onClose={() => setSupportOpen(false)}
+            />
         </nav>
     )
 }

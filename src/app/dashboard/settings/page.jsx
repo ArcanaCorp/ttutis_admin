@@ -6,14 +6,18 @@ import {
     Check,
     ChevronRight,
     Clock3,
+    ExternalLink,
     FileLock2,
     Globe2,
+    Headset,
     KeyRound,
     MonitorCog,
+    RefreshCw,
     ShieldCheck,
     UserRound,
 } from "lucide-react";
 import AccountActionModal from "@/components/settings/AccountActionModal";
+import SupportModal from "@/components/support/SupportModal";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Modal from "@/components/ui/Modal";
@@ -28,11 +32,15 @@ import {
     getProfilePreferences,
     saveProfilePreferences,
 } from "@/services/settings.services";
+import { getSupportTickets } from "@/services/support.services";
+import { recordAuditEvent } from "@/services/audit.services";
+import { updateDeviceStatus } from "@/services/devices.services";
 
 const settingTabs = [
     ["account", "Cuenta y seguridad", UserRound],
     ["preferences", "Preferencias", MonitorCog],
     ["notifications", "Notificaciones", Bell],
+    ["support", "Soporte", Headset],
     ["legal", "Legal y privacidad", FileLock2],
 ];
 
@@ -77,6 +85,21 @@ const notificationOptions = [
         description: "Anuncios, citaciones y comunicados de tu institución.",
     },
 ];
+
+const supportCategoryLabels = {
+    ACCESS: "Acceso a mi cuenta",
+    ACADEMIC: "Gestión académica",
+    PAYMENTS: "Pagos",
+    COMMUNICATIONS: "Comunicaciones",
+    OTHER: "Otro tema",
+};
+
+const supportStatusLabels = {
+    OPEN: "Abierto",
+    IN_PROGRESS: "En atención",
+    RESOLVED: "Resuelto",
+    CLOSED: "Cerrado",
+};
 
 function formatDate(value) {
     if (!value) return "No disponible";
@@ -148,7 +171,14 @@ function LegalDocumentModal({ document, onClose }) {
 
 export default function Page() {
     const { user } = useAuth();
-    const { profile, account, updateProfile } = useProfile();
+    const {
+        profile,
+        account,
+        userDevices = [],
+        currentInstitution,
+        updateProfile,
+        refreshProfile,
+    } = useProfile();
     const [activeTab, setActiveTab] = useState("account");
     const [preferences, setPreferences] = useState(defaultProfilePreferences);
     const [preferencesLoading, setPreferencesLoading] = useState(true);
@@ -157,13 +187,89 @@ export default function Page() {
     const [notice, setNotice] = useState("");
     const [accountAction, setAccountAction] = useState("");
     const [legalDocument, setLegalDocument] = useState(null);
+    const [supportOpen, setSupportOpen] = useState(false);
+    const [supportTickets, setSupportTickets] = useState([]);
+    const [supportLoading, setSupportLoading] = useState(true);
+    const [supportError, setSupportError] = useState("");
+    const [supportRefreshKey, setSupportRefreshKey] = useState(0);
+    const [deviceUpdatingId, setDeviceUpdatingId] = useState("");
+    const [deviceError, setDeviceError] = useState("");
     const displayName = profile?.display_name || account?.displayName || "Usuario TTUTIS";
+
+    useEffect(() => {
+        if (activeTab !== "support" || !user?.id) return undefined;
+        let active = true;
+        let debounceTimer;
+        const initialLoadTimer = setTimeout(() => {
+            if (!active) return;
+            setSupportLoading(true);
+            setSupportError("");
+            getSupportTickets()
+                .then(tickets => {
+                    if (active) setSupportTickets(tickets);
+                })
+                .catch(loadError => {
+                    if (active) setSupportError(loadError.message || "No se pudieron cargar tus tickets.");
+                })
+                .finally(() => {
+                    if (active) setSupportLoading(false);
+                });
+        }, 0);
+
+        const refreshTickets = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                getSupportTickets()
+                    .then(tickets => {
+                        if (active) setSupportTickets(tickets);
+                    })
+                    .catch(loadError => {
+                        if (active) setSupportError(loadError.message || "No se pudieron cargar tus tickets.");
+                    });
+            }, 180);
+        };
+
+        const supabase = createClient();
+        const channel = supabase
+            .channel(`support-tickets-${user.id}`)
+            .on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "support_tickets",
+                filter: `requester_profile_id=eq.${user.id}`,
+            }, refreshTickets)
+            .on("postgres_changes", {
+                event: "UPDATE",
+                schema: "public",
+                table: "support_tickets",
+                filter: `requester_profile_id=eq.${user.id}`,
+            }, refreshTickets)
+            .on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "support_ticket_attachments",
+            }, refreshTickets)
+            .subscribe(status => {
+                if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                    console.warn("Realtime no pudo suscribirse a los tickets de soporte.");
+                }
+            });
+
+        return () => {
+            active = false;
+            clearTimeout(initialLoadTimer);
+            clearTimeout(debounceTimer);
+            supabase.removeChannel(channel);
+        };
+    }, [activeTab, user?.id, supportRefreshKey]);
 
     useEffect(() => {
         if (!user?.id) return undefined;
         let active = true;
+        let debounceTimer;
+        const supabase = createClient();
 
-        getProfilePreferences(user.id)
+        const loadPreferences = () => getProfilePreferences(user.id)
             .then(saved => {
                 if (active) setPreferences(saved);
             })
@@ -179,8 +285,32 @@ export default function Page() {
                 if (active) setPreferencesLoading(false);
             });
 
+        const schedulePreferenceRefresh = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadPreferences, 150);
+        };
+
+        loadPreferences();
+        const channel = supabase
+            .channel(`profile-preferences-${user.id}`)
+            .on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "profile_preferences",
+                filter: `profile_id=eq.${user.id}`,
+            }, schedulePreferenceRefresh)
+            .on("postgres_changes", {
+                event: "UPDATE",
+                schema: "public",
+                table: "profile_preferences",
+                filter: `profile_id=eq.${user.id}`,
+            }, schedulePreferenceRefresh)
+            .subscribe();
+
         return () => {
             active = false;
+            clearTimeout(debounceTimer);
+            supabase.removeChannel(channel);
         };
     }, [user?.id]);
 
@@ -227,7 +357,23 @@ export default function Page() {
         });
 
         if (updateError) throw updateError;
+        await recordAuditEvent("PASSWORD_CHANGED");
         setNotice("La contraseña se cambió correctamente.");
+    };
+
+    const toggleDeviceStatus = async device => {
+        const nextStatus = device.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+        setDeviceUpdatingId(device.id);
+        setDeviceError("");
+
+        try {
+            await updateDeviceStatus(device.id, nextStatus);
+            await refreshProfile();
+        } catch (error) {
+            setDeviceError(error.message || "No se pudo actualizar el dispositivo.");
+        } finally {
+            setDeviceUpdatingId("");
+        }
     };
 
     const updatePreference = (key, value) => {
@@ -341,6 +487,55 @@ export default function Page() {
                         >
                             Actualizar contraseña
                         </Button>
+                    </Card>
+
+                    <Card
+                        variant="default"
+                        title="Dispositivos registrados"
+                        subtitle="Navegadores y dispositivos vinculados a tu cuenta"
+                        icon={MonitorCog}
+                        iconVariant="neutral"
+                    >
+                        <p className="mb-md text-xs text-secondary">
+                            Puedes desactivar un registro para detener su uso en las funciones de dispositivo. Esto no cierra sesiones abiertas.
+                        </p>
+                        {deviceError && (
+                            <p role="alert" className="mb-md text-sm text-error">{deviceError}</p>
+                        )}
+                        {userDevices.length ? (
+                            <div className="flex flex-col divide-y">
+                                {userDevices.map(device => (
+                                    <div
+                                        key={device.id}
+                                        className="flex items-center justify-between gap-md py-md"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">
+                                                {device.device_name || (device.platform === "WEB" ? "Navegador web" : device.platform)}
+                                            </p>
+                                            <p className="text-xs text-secondary">
+                                                {device.status === "ACTIVE" ? "Activo" : "Desactivado"}
+                                                {device.last_seen_at ? ` · Último acceso ${formatDate(device.last_seen_at)}` : ""}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant={device.status === "ACTIVE" ? "outline" : "primary"}
+                                            size="sm"
+                                            loading={deviceUpdatingId === device.id}
+                                            loadingText="Actualizando…"
+                                            disabled={Boolean(deviceUpdatingId)}
+                                            onClick={() => toggleDeviceStatus(device)}
+                                        >
+                                            {device.status === "ACTIVE" ? "Desactivar" : "Activar"}
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-secondary">
+                                Este navegador se registrará al iniciar sesión. Aún no hay dispositivos vinculados.
+                            </p>
+                        )}
                     </Card>
                 </div>
             )}
@@ -484,6 +679,103 @@ export default function Page() {
                 </>
             )}
 
+            {activeTab === "support" && (
+                <div className="flex flex-col gap-md">
+                    <Card
+                        variant="default"
+                        title="Centro de soporte"
+                        subtitle="Solicitudes de atención creadas desde tu cuenta"
+                        icon={Headset}
+                        iconVariant="info"
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-md">
+                            <p className="text-sm text-secondary">
+                                Revisa el estado de tus solicitudes o crea un ticket nuevo con capturas de pantalla.
+                            </p>
+                            <div className="flex gap-sm">
+                                <Button
+                                    variant="outline"
+                                    icon={RefreshCw}
+                                    loading={supportLoading}
+                                    loadingText="Actualizando…"
+                                    onClick={() => setSupportRefreshKey(value => value + 1)}
+                                >
+                                    Actualizar
+                                </Button>
+                                <Button icon={Headset} onClick={() => setSupportOpen(true)}>
+                                    Nuevo ticket
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {supportError && (
+                        <div role="alert" className="rounded-lg bg-error p-md text-sm text-error">
+                            {supportError}
+                        </div>
+                    )}
+
+                    {supportLoading ? (
+                        <p className="p-md text-sm text-secondary">Cargando tus tickets…</p>
+                    ) : supportTickets.length ? (
+                        <section className="flex flex-col gap-md" aria-label="Mis tickets de soporte">
+                            {supportTickets.map(ticket => (
+                                <Card
+                                    key={ticket.id}
+                                    variant="default"
+                                    title={ticket.subject}
+                                    subtitle={`${supportCategoryLabels[ticket.category] || ticket.category} · ${formatDate(ticket.created_at)}`}
+                                    icon={Headset}
+                                    iconVariant="neutral"
+                                >
+                                    <div className="flex flex-col gap-md">
+                                        <div className="flex flex-wrap items-center justify-between gap-sm">
+                                            <span className="rounded-full bg-surface px-sm py-xs text-xs font-medium">
+                                                {supportStatusLabels[ticket.status] || ticket.status}
+                                            </span>
+                                            <span className="text-xs text-secondary">
+                                                Ticket {ticket.id.slice(0, 8).toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <p style={{ whiteSpace: "pre-wrap" }} className="text-sm text-secondary">
+                                            {ticket.description}
+                                        </p>
+                                        {ticket.attachments?.length > 0 && (
+                                            <div className="flex flex-wrap gap-sm border-t pt-sm">
+                                                {ticket.attachments.map(attachment => (
+                                                    attachment.signed_url ? (
+                                                        <a
+                                                            key={attachment.id}
+                                                            href={attachment.signed_url}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-xs rounded-md border px-sm py-xs text-xs text-link"
+                                                        >
+                                                            {attachment.file_name}
+                                                            <ExternalLink size={13} />
+                                                        </a>
+                                                    ) : (
+                                                        <span key={attachment.id} className="text-xs text-secondary">
+                                                            {attachment.file_name}
+                                                        </span>
+                                                    )
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card>
+                            ))}
+                        </section>
+                    ) : (
+                        <Card variant="default" title="Aún no tienes tickets">
+                            <p className="text-sm text-secondary">
+                                Cuando envíes una solicitud aparecerá aquí junto con su estado y capturas adjuntas.
+                            </p>
+                        </Card>
+                    )}
+                </div>
+            )}
+
             {accountAction && (
                 <AccountActionModal
                     key={accountAction}
@@ -495,6 +787,13 @@ export default function Page() {
                     onChangePassword={changePassword}
                 />
             )}
+
+            <SupportModal
+                open={supportOpen}
+                institutionId={currentInstitution?.id}
+                onClose={() => setSupportOpen(false)}
+                onCreated={() => setSupportRefreshKey(value => value + 1)}
+            />
 
             <LegalDocumentModal
                 document={legalDocument}

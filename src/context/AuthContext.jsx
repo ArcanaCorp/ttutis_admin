@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { recordAuditEvent } from "@/services/audit.services";
+import { registerCurrentBrowser } from "@/services/devices.services";
 
 const AuthContext = createContext(null);
 
@@ -10,6 +12,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const registeredDeviceUserRef = useRef(null);
 
     useEffect(() => {
         let active = true;
@@ -42,6 +45,17 @@ export function AuthProvider({ children }) {
         };
     }, []);
 
+    useEffect(() => {
+        if (!user?.id) {
+            registeredDeviceUserRef.current = null;
+            return;
+        }
+
+        if (registeredDeviceUserRef.current === user.id) return;
+        registeredDeviceUserRef.current = user.id;
+        registerCurrentBrowser();
+    }, [user?.id]);
+
     const signIn = useCallback(async (email, password) => {
         const supabase = supabaseRef.current;
         if (!supabase) return { error: new Error("El cliente de autenticación aún no está disponible.") };
@@ -49,6 +63,8 @@ export function AuthProvider({ children }) {
         if (error) return { error };
         setSession(data.session);
         setUser(data.user);
+        await registerCurrentBrowser({ reactivate: true });
+        await recordAuditEvent("LOGIN_SUCCESS");
         return { error: null };
     }, []);
 
@@ -67,6 +83,7 @@ export function AuthProvider({ children }) {
         if (data.session) {
             setSession(data.session);
             setUser(data.user);
+            await recordAuditEvent("ACCOUNT_SIGNUP");
         }
         return { data, error: null };
     }, []);
@@ -74,6 +91,7 @@ export function AuthProvider({ children }) {
     const signOut = useCallback(async () => {
         const supabase = supabaseRef.current;
         if (!supabase) return { error: new Error("El cliente de autenticación aún no está disponible.") };
+        await recordAuditEvent("LOGOUT");
         const { error } = await supabase.auth.signOut();
         if (error) return { error };
         setSession(null);

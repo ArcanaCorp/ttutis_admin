@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const UPDATE_TYPES = [
     "ANNOUNCEMENT",
@@ -65,12 +65,7 @@ export async function POST(request) {
             return fail("La gestión de comunicaciones no está configurada en el servidor.", 503);
         }
 
-        const admin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false,
-            },
-        });
+        const admin = createAdminClient(user.id);
 
         const { data: membership, error: membershipError } = await admin
             .from("memberships")

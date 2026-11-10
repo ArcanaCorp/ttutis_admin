@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@/lib/supabase/client";
 import { fetchProfileData, toAccount, updateInstitutionRecord, updateProfileRecord } from "@/services/profile.services";
 
 const ProfileContext = createContext(null);
@@ -137,6 +138,70 @@ export function ProfileProvider({ children }) {
         }
         return false;
     }, [data.memberships]);
+
+    useEffect(() => {
+        if (!user?.id) return undefined;
+
+        const supabase = createClient();
+        let debounceTimer;
+        const scheduleRefresh = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => refreshProfile(), 160);
+        };
+        let channel = supabase.channel(`profile-data-${user.id}`);
+        const profileTables = [
+            ["profiles", "id"],
+            ["memberships", "profile_id"],
+            ["user_devices", "profile_id"],
+            ["guardian_student_links", "guardian_profile_id"],
+        ];
+
+        profileTables.forEach(([table, column]) => {
+            ["INSERT", "UPDATE"].forEach(event => {
+                channel = channel.on("postgres_changes", {
+                    event,
+                    schema: "public",
+                    table,
+                    filter: `${column}=eq.${user.id}`,
+                }, scheduleRefresh);
+            });
+        });
+
+        ["actor_profile_id", "subject_profile_id"].forEach(column => {
+            channel = channel.on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "audit_logs",
+                filter: `${column}=eq.${user.id}`,
+            }, scheduleRefresh);
+        });
+
+        const institutionIds = [...new Set(data.memberships
+            .map(membership => membership.institution_id)
+            .filter(Boolean))];
+
+        institutionIds.forEach(institutionId => {
+            ["INSERT", "UPDATE"].forEach(event => {
+                channel = channel.on("postgres_changes", {
+                    event,
+                    schema: "public",
+                    table: "institutions",
+                    filter: `id=eq.${institutionId}`,
+                }, scheduleRefresh);
+            });
+        });
+
+        channel.subscribe(status => {
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                console.warn("Realtime no pudo suscribirse al perfil de la cuenta.");
+            }
+        });
+
+        return () => {
+            clearTimeout(debounceTimer);
+            supabase.removeChannel(channel);
+        };
+    }, [data.memberships, refreshProfile, user?.id]);
 
     const value = useMemo(() => ({
         ...data,

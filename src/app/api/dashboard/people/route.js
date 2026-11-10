@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const isEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const clean = value => typeof value === "string" ? value.trim() : "";
@@ -299,16 +299,7 @@ export async function POST(request) {
             );
         }
 
-        const adminClient = createAdminClient(
-            supabaseUrl,
-            serviceRoleKey,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false,
-                },
-            }
-        );
+        const adminClient = createAdminClient(user.id);
 
         const { data: adminMembership, error: membershipError } =
             await adminClient

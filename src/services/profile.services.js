@@ -20,7 +20,11 @@ export async function fetchProfileData(user) {
     const [profileResult, membershipsResult, devicesResult, guardianLinksResult] = await Promise.all([
         supabase.from("profiles").select(profileFields).eq("id", user.id).maybeSingle(),
         supabase.from("memberships").select("*").eq("profile_id", user.id).order("created_at", { ascending: true }),
-        supabase.from("user_devices").select("*").eq("profile_id", user.id).order("created_at", { ascending: false }),
+        supabase
+            .from("user_devices")
+            .select("id,profile_id,device_key,device_name,platform,status,last_seen_at,created_at")
+            .eq("profile_id", user.id)
+            .order("last_seen_at", { ascending: false, nullsFirst: false }),
         supabase.from("guardian_student_links").select("*").eq("guardian_profile_id", user.id).order("created_at", { ascending: false }),
     ]);
 

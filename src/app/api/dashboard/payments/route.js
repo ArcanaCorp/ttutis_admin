@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const fail = (message, status = 400) =>
     NextResponse.json({ error: message }, { status });
@@ -45,12 +45,7 @@ async function getContext(request, institutionId) {
         return { response: fail("El módulo de pagos no está configurado en el servidor.", 503) };
     }
 
-    const admin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
-    });
+    const admin = createAdminClient(user.id);
 
     const { data: membership, error: membershipError } = await admin
         .from("memberships")

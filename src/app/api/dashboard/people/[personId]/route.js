@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const clean = value => typeof value === "string" ? value.trim() : "";
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
@@ -13,7 +13,7 @@ async function getAdminContext(request, payload) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !serviceKey) return { response: fail("La gestión de personas no está configurada en el servidor.", 503) };
-    const admin = createSupabaseClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    const admin = createAdminClient(user.id);
     const { data: membership, error } = await admin.from("memberships").select("id").eq("institution_id", payload.institutionId).eq("profile_id", user.id).eq("role", "ADMIN").eq("status", "ACTIVE").maybeSingle();
     if (error) return { response: fail(error.message, 400) };
     if (!membership) return { response: fail("Necesitas una membresía ADMIN activa en esta institución.", 403) };
@@ -95,7 +95,7 @@ export async function POST(request) {
     if (!payload?.institutionId || !["STUDENT", "TEACHER", "ASSISTANT", "GUARDIAN"].includes(payload.type)) return fail("No se identificó la persona o la institución.");
     const context = await getAdminContext(request, payload);
     if (context.response) return context.response;
-    const { admin } = context;
+    const { admin, user } = context;
     let email = "";
     let userName = "";
     let accessCode = "";
@@ -154,6 +154,21 @@ export async function POST(request) {
     const accountTypes = { STUDENT: "Alumno", TEACHER: "Docente", ASSISTANT: "Auxiliar", GUARDIAN: "Apoderado" };
     const { error: passwordError } = await admin.auth.admin.updateUserById(payload.profileId, { password: temporaryPassword, email_confirm: true });
     if (passwordError) return fail(`No se pudo preparar la contraseña temporal: ${passwordError.message}`, 500);
+
+    const { error: auditError } = await admin.from("audit_logs").insert({
+        actor_profile_id: user.id,
+        subject_profile_id: payload.profileId,
+        institution_id: payload.institutionId,
+        event_type: "CREDENTIALS_RESET",
+        resource_table: "auth.users",
+        resource_id: payload.profileId,
+        changed_fields: ["password", "email_confirmed"],
+        metadata: { method: "invitation" },
+    });
+
+    if (auditError) {
+        console.warn("Temporary credentials updated but its audit record could not be saved.", auditError.message);
+    }
 
     const templateId = process.env.RESEND_INVITATION_TEMPLATE_ID || "invitacion-ttutis";
     const emailVariables = {

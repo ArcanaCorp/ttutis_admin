@@ -389,12 +389,15 @@ CREATE TABLE public.user_devices (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     profile_id uuid NOT NULL,
     platform text NOT NULL CHECK (platform = ANY (ARRAY['IOS'::text, 'ANDROID'::text, 'WEB'::text])),
-    push_token text NOT NULL UNIQUE,
+    push_token text UNIQUE,
+    device_key text NOT NULL DEFAULT gen_random_uuid()::text,
+    device_name text,
     status text NOT NULL DEFAULT 'ACTIVE'::text CHECK (status = ANY (ARRAY['ACTIVE'::text, 'INACTIVE'::text])),
     last_seen_at timestamp with time zone,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT user_devices_pkey PRIMARY KEY (id),
-    CONSTRAINT user_devices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
+    CONSTRAINT user_devices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
+    CONSTRAINT user_devices_profile_device_key_key UNIQUE (profile_id, device_key)
 );
 
 CREATE TABLE public.profile_preferences (
@@ -411,4 +414,69 @@ CREATE TABLE public.profile_preferences (
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT profile_preferences_pkey PRIMARY KEY (profile_id),
     CONSTRAINT profile_preferences_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
+);
+
+CREATE TABLE public.support_tickets (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    requester_profile_id uuid,
+    requester_name text,
+    requester_email text NOT NULL,
+    institution_id uuid,
+    category text NOT NULL CHECK (category = ANY (ARRAY['ACCESS'::text, 'ACADEMIC'::text, 'PAYMENTS'::text, 'COMMUNICATIONS'::text, 'OTHER'::text])),
+    subject text NOT NULL CHECK (char_length(subject) BETWEEN 4 AND 140),
+    description text NOT NULL CHECK (char_length(description) BETWEEN 10 AND 5000),
+    status text NOT NULL DEFAULT 'OPEN'::text CHECK (status = ANY (ARRAY['OPEN'::text, 'IN_PROGRESS'::text, 'RESOLVED'::text, 'CLOSED'::text])),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT support_tickets_pkey PRIMARY KEY (id),
+    CONSTRAINT support_tickets_requester_profile_id_fkey FOREIGN KEY (requester_profile_id) REFERENCES public.profiles(id),
+    CONSTRAINT support_tickets_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id)
+);
+
+CREATE TABLE public.support_ticket_attachments (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    ticket_id uuid NOT NULL,
+    uploaded_by_profile_id uuid,
+    storage_path text NOT NULL UNIQUE,
+    file_name text NOT NULL,
+    mime_type text NOT NULL CHECK (mime_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text])),
+    size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 5242880),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT support_ticket_attachments_pkey PRIMARY KEY (id),
+    CONSTRAINT support_ticket_attachments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.support_tickets(id),
+    CONSTRAINT support_ticket_attachments_uploaded_by_profile_id_fkey FOREIGN KEY (uploaded_by_profile_id) REFERENCES public.profiles(id)
+);
+
+CREATE TABLE public.audit_logs (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    actor_profile_id uuid,
+    subject_profile_id uuid,
+    institution_id uuid,
+    event_type text NOT NULL,
+    resource_table text,
+    resource_id text,
+    changed_fields text[] NOT NULL DEFAULT '{}'::text[],
+    old_values jsonb,
+    new_values jsonb,
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.institution_change_pulses (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    institution_id uuid NOT NULL,
+    resource_table text NOT NULL,
+    event_type text NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT institution_change_pulses_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.app_audit_events (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    actor_profile_id uuid NOT NULL,
+    event_type text NOT NULL CHECK (event_type = ANY (ARRAY['LOGIN_SUCCESS'::text, 'LOGOUT'::text, 'ACCOUNT_SIGNUP'::text, 'PASSWORD_CHANGED'::text])),
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT app_audit_events_pkey PRIMARY KEY (id)
 );

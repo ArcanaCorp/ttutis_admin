@@ -4,6 +4,13 @@ import { connection } from "next/server";
 import Navbar from "@/components/layout/Navbar";
 import DashboardSkeleton from "@/components/ui/DashboardSkeleton";
 import { createClient } from "@/lib/supabase/server";
+import { createPageMetadata } from "@/lib/metadata";
+
+export const metadata = createPageMetadata({
+    title: "Panel de inicio",
+    description: "Resumen de la actividad y el estado de tu institución educativa.",
+    path: "/dashboard",
+});
 
 export default function DashboardLayout({ children }) {
     return <Suspense fallback={<DashboardSkeleton />}><ProtectedDashboard>{children}</ProtectedDashboard></Suspense>;

@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { resend } from "@/lib/resend/resend";
 
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
@@ -43,12 +43,7 @@ export async function POST(request) {
             return fail("La gestión de personas no está configurada en el servidor.", 503);
         }
 
-        const admin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false,
-            },
-        });
+        const admin = createAdminClient(user.id);
 
         const { data: adminMembership, error: adminError } = await admin
             .from("memberships")
@@ -141,6 +136,21 @@ export async function POST(request) {
 
         if (error) {
             return fail(error.message, 502);
+        }
+
+        const { error: auditError } = await admin.from("audit_logs").insert({
+            actor_profile_id: user.id,
+            subject_profile_id: profileId,
+            institution_id: institutionId,
+            event_type: "INVITATION_EMAIL_SENT",
+            resource_table: "memberships",
+            resource_id: membershipId || null,
+            changed_fields: ["invitation_email"],
+            metadata: { account_type: type || "UNKNOWN", email_id: data?.id || null },
+        });
+
+        if (auditError) {
+            console.warn("Invitation sent but its audit record could not be saved.", auditError.message);
         }
 
         return NextResponse.json({
