@@ -9,6 +9,7 @@ import Button from "../ui/Button";
 import Avatar from "../ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useProfile } from "@/context/ProfileContext";
+import { getInstitutionLogoUrl } from "@/services/institutionLogo.services";
 import { Headset } from "lucide-react";
 
 export default function Navbar () {
@@ -19,6 +20,7 @@ export default function Navbar () {
     const [signingOut, setSigningOut] = useState(false);
     const [signOutError, setSignOutError] = useState("");
     const institutionName = currentInstitution?.trade_name || currentInstitution?.legal_name || "Tu colegio";
+    const institutionLogoUrl = getInstitutionLogoUrl(currentInstitution?.id, currentInstitution?.logo_path);
 
     const handleSignOut = async () => {
         setSigningOut(true);
@@ -38,7 +40,7 @@ export default function Navbar () {
             <div className="flex flex-col gap-md">
                 <div className="flex gap-sm border p-md radius-md">
                     <div className="square center" style={{"--sq": "40px"}}>
-                        <Avatar name={institutionName} size={36} />
+                        <Avatar name={institutionName} src={institutionLogoUrl} alt={`Logo de ${institutionName}`} size={36} />
                     </div>
                     <div>
                         <h2>{profileLoading ? "Cargando colegio…" : institutionName}</h2>

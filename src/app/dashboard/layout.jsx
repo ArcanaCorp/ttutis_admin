@@ -21,7 +21,7 @@ async function ProtectedDashboard({ children }) {
     return (
         <div className="h-screen grid grid-dashboard bg-subtle overflow-hidden">
             <Navbar />
-            <main className="h-screen p-md scroll scroll-y-auto">
+            <main className="h-screen px-md py-lg scroll scroll-y-auto">
                 {children}
             </main>
         </div>

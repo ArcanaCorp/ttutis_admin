@@ -1,15 +1,16 @@
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE_SIZE = 500;
+const STUDENT_COLUMNS = "id,institution_id,membership_id,first_names,last_names,phone,email,student_code,status,created_at";
 
-async function selectByInstitution(table, institutionId, { orderBy = "created_at", ascending = false } = {}) {
+async function selectByInstitution(table, institutionId, { columns = "*", orderBy = "created_at", ascending = false } = {}) {
     if (!institutionId) return [];
     const supabase = createClient();
     const rows = [];
     let from = 0;
 
     while (true) {
-        let query = supabase.from(table).select("*").eq("institution_id", institutionId);
+        let query = supabase.from(table).select(columns).eq("institution_id", institutionId);
         if (orderBy) query = query.order(orderBy, { ascending });
         const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(`No se pudieron cargar ${table}: ${error.message}`);
@@ -30,7 +31,7 @@ async function loadTables(institutionId, tables) {
 }
 
 export const getDashboardData = institutionId => loadTables(institutionId, [
-    ["students", "students"],
+    ["students", "students", { columns: STUDENT_COLUMNS }],
     ["memberships", "memberships"],
     ["classrooms", "classrooms"],
     ["enrollments", "enrollments"],
@@ -42,7 +43,7 @@ export const getDashboardData = institutionId => loadTables(institutionId, [
 
 export const getAttendanceData = institutionId => loadTables(institutionId, [
     ["attendance_events", "attendance_events", { orderBy: "occurred_at" }],
-    ["students", "students"],
+    ["students", "students", { columns: STUDENT_COLUMNS }],
     ["memberships", "memberships"],
     ["academic_years", "academic_years", { orderBy: "starts_on", ascending: false }],
 ]);
@@ -53,7 +54,7 @@ export const getCommunicationsData = institutionId => loadTables(institutionId, 
 
 export const getPaymentsData = institutionId => loadTables(institutionId, [
     ["student_fees", "student_fees", { orderBy: "due_date" }],
-    ["students", "students"],
+    ["students", "students", { columns: STUDENT_COLUMNS }],
     ["memberships", "memberships"],
 ]);
 
@@ -61,7 +62,7 @@ export const getSchoolYearData = institutionId => loadTables(institutionId, [
     ["academic_years", "academic_years", { orderBy: "starts_on", ascending: false }],
     ["enrollments", "enrollments", { orderBy: "enrolled_at" }],
     ["classrooms", "classrooms"],
-    ["students", "students"],
+    ["students", "students", { columns: STUDENT_COLUMNS }],
 ]);
 
 export const getClassesSchedulesData = institutionId => loadTables(institutionId, [
@@ -74,13 +75,23 @@ export const getClassesSchedulesData = institutionId => loadTables(institutionId
     ["enrollments", "enrollments"],
 ]);
 
-export const getPeopleData = institutionId => loadTables(institutionId, [
-    ["memberships", "memberships"],
-    ["students", "students"],
-    ["guardian_student_links", "guardian_student_links"],
-    ["enrollments", "enrollments"],
-    ["classrooms", "classrooms"],
-]);
+export async function getPeopleData(institutionId) {
+    const data = await loadTables(institutionId, [
+        ["memberships", "memberships"],
+        ["students", "students", { columns: STUDENT_COLUMNS }],
+        ["guardian_student_links", "guardian_student_links"],
+        ["enrollments", "enrollments"],
+        ["classrooms", "classrooms"],
+    ]);
+    const guardianIds = [...new Set(data.guardian_student_links.map(link => link.guardian_profile_id).filter(Boolean))];
+    if (!guardianIds.length) return { ...data, guardian_profiles: [] };
+    const { data: guardianProfiles, error } = await createClient()
+        .from("profiles")
+        .select("id,display_name")
+        .in("id", guardianIds);
+    // The directory remains available even when profile visibility is restricted by RLS.
+    return { ...data, guardian_profiles: error ? [] : guardianProfiles ?? [] };
+}
 
 export const getSettingsData = institutionId => loadTables(institutionId, [
     ["memberships", "memberships"],

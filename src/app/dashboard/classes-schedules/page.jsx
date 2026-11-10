@@ -6,12 +6,13 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
 import ResourceStatus from "@/components/ui/ResourceStatus";
+import Modal from "@/components/ui/Modal";
 import { useClassesSchedulesData } from "@/hooks/useInstitutionData";
 import {
     BookOpen, CalendarDays, Users, GraduationCap, Clock3, Search,
     Plus, ChevronDown, MoreHorizontal, Pencil, Trash2, Filter,
     LayoutGrid, List, CalendarRange, UserRound, DoorOpen, BookMarked,
-    Info, X, Check
+    Info, Check
 } from "lucide-react";
 
 const levelLabels = {
@@ -465,51 +466,43 @@ export default function Page() {
             </div>
 
             {/* Modal de acción inicial */}
-            {showForm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={event => {
-                    if (event.target === event.currentTarget) setShowForm(false);
-                }}>
-                    <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-5">
-                        <div className="flex items-start justify-between gap-md">
-                            <div>
-                                <h3 className="text-lg font-semibold">Nueva configuración</h3>
-                                <p className="text-sm text-gray-500 mt-1">Elige qué deseas configurar.</p>
-                            </div>
-                            <Button variant="ghost" icon={X} iconOnly accessibilityLabel="Cerrar" onClick={() => setShowForm(false)} />
-                        </div>
-                        <div className="grid gap-sm mt-5">
-                            {[
-                                { tab: "classrooms", title: "Crear aula o sección", description: "Registra un nivel, grado y sección.", icon: DoorOpen },
-                                { tab: "courses", title: "Asignar curso y profesor", description: "Vincula un curso con un aula y docente.", icon: BookOpen },
-                                { tab: "schedules", title: "Configurar horario", description: "Programa el día y la hora de una clase.", icon: Clock3 },
-                            ].map(option => {
-                                const Icon = option.icon;
-                                return (
-                                    <Button
-                                        key={option.tab}
-                                        onClick={() => {
-                                            setActiveTab(option.tab);
-                                            setShowForm(false);
-                                        }}
-                                        variant="ghost"
-                                        fullWidth
-                                        className="academic-choice"
-                                    >
-                                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
-                                            <Icon size={18} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-semibold">{option.title}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">{option.description}</p>
-                                        </div>
-                                        <ChevronDown size={16} className="-rotate-90 text-gray-400" />
-                                    </Button>
-                                );
-                            })}
-                        </div>
-                    </div>
+            <Modal
+                open={showForm}
+                onClose={() => setShowForm(false)}
+                title="Nueva configuración"
+                description="Elige qué deseas configurar."
+            >
+                <div className="grid gap-sm">
+                    {[
+                        { tab: "classrooms", title: "Crear aula o sección", description: "Registra un nivel, grado y sección.", icon: DoorOpen },
+                        { tab: "courses", title: "Asignar curso y profesor", description: "Vincula un curso con un aula y docente.", icon: BookOpen },
+                        { tab: "schedules", title: "Configurar horario", description: "Programa el día y la hora de una clase.", icon: Clock3 },
+                    ].map(option => {
+                        const Icon = option.icon;
+                        return (
+                            <Button
+                                key={option.tab}
+                                onClick={() => {
+                                    setActiveTab(option.tab);
+                                    setShowForm(false);
+                                }}
+                                variant="ghost"
+                                fullWidth
+                                className="academic-choice"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
+                                    <Icon size={18} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold">{option.title}</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{option.description}</p>
+                                </div>
+                                <ChevronDown size={16} className="-rotate-90 text-gray-400" />
+                            </Button>
+                        );
+                    })}
                 </div>
-            )}
+            </Modal>
             
         </div>
     );

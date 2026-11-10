@@ -117,6 +117,7 @@ const Input = ({
     const [passwordVisible, setPasswordVisible] = useState(false);
 
     const isControlled = value !== undefined;
+    const isFileInput = type === 'file';
     const currentValue = isControlled ? value : internalValue;
 
     const hasValue =
@@ -163,7 +164,7 @@ const Input = ({
     const handleChange = (event) => {
         const nextValue = event.target.value;
 
-        if (!isControlled) {
+        if (!isControlled && !isFileInput) {
         setInternalValue(nextValue);
         }
 
@@ -249,7 +250,7 @@ const Input = ({
                 id={generatedId}
                 name={inputName || name}
                 type={actualType}
-                value={currentValue ?? ''}
+                value={isFileInput ? undefined : currentValue ?? ''}
                 placeholder={placeholder}
                 onChange={handleChange}
                 onFocus={handleFocus}

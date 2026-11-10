@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchProfileData, toAccount, updateInstitutionRecord, updateProfileRecord } from "@/services/profileService";
+import { fetchProfileData, toAccount, updateInstitutionRecord, updateProfileRecord } from "@/services/profile.services";
 
 const ProfileContext = createContext(null);
 

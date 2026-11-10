@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
+import PeopleRegistrationModal from "@/components/people/PeopleRegistrationModal";
 import ResourceStatus from "@/components/ui/ResourceStatus";
 import { usePeopleData } from "@/hooks/useInstitutionData";
 
@@ -24,11 +25,13 @@ import {
 } from "lucide-react";
 
 export default function Page() {
-    const { data = {}, loading, error, refresh } = usePeopleData();
-    const { memberships = [], students = [], guardian_student_links = [], enrollments = [], classrooms = [] } = data;
+    const { data = {}, loading, error, refresh, canManage, createPeople } = usePeopleData();
+    const { memberships = [], students = [], guardian_student_links = [], guardian_profiles = [], enrollments = [], classrooms = [] } = data;
 
     const [search, setSearch] = useState("");
     const [selectedType, setSelectedType] = useState("ALL");
+    const [showRegistration, setShowRegistration] = useState(false);
+    const [notice, setNotice] = useState("");
 
     // ========================================
     // HELPERS
@@ -155,12 +158,13 @@ export default function Page() {
 
         guardianProfileIds.forEach(profileId => {
             const guardianMembership = memberships.find(item => item.profile_id === profileId);
+            const guardianProfile = guardian_profiles.find(item => item.id === profileId);
             const guardianLinks = guardian_student_links.filter(link => link.guardian_profile_id === profileId);
 
             result.push({
                 id: `guardian-${profileId}`,
                 profileId,
-                name: guardianMembership?.full_name || "Apoderado",
+                name: guardianMembership?.full_name || guardianProfile?.display_name || "Apoderado",
                 code: guardianMembership?.login_code,
                 email: guardianMembership?.email,
                 phone: null,
@@ -269,8 +273,9 @@ export default function Page() {
             <PageHeader
                 title="Personas"
                 description="Administra los alumnos, docentes, auxiliares y apoderados."
-                actions={<Button variant="secondary" icon={Plus}>Registrar persona</Button>}
+                actions={<Button variant="secondary" icon={Plus} onClick={() => { setNotice(""); setShowRegistration(true); }} disabled={!canManage}>Registrar persona</Button>}
             />
+            {notice && <p className="border radius-md bg-success p-md text-sm text-success" role="status">{notice}</p>}
 
             {/* STATS */}
 
@@ -496,6 +501,23 @@ export default function Page() {
                 </div>
 
             </section>
+
+            <PeopleRegistrationModal
+                open={showRegistration}
+                onClose={() => setShowRegistration(false)}
+                students={students}
+                onCreate={async payload => {
+                    const result = await createPeople(payload);
+                    const counts = [
+                        result.studentsCreated ? `${result.studentsCreated} alumnos` : null,
+                        result.staffCreated ? `${result.staffCreated} docentes y auxiliares` : null,
+                        result.guardiansLinked ? `${result.guardiansLinked} vínculos con apoderados` : null,
+                    ].filter(Boolean).join(", ");
+                    const invites = result.invitationsSent ? ` Se enviaron ${result.invitationsSent} invitaciones por correo.` : "";
+                    setNotice(`Registro completado: ${counts || "personas actualizadas"}.${invites}`);
+                    return result;
+                }}
+            />
 
         </div>
     );
