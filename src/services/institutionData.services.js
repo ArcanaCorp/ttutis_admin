@@ -50,12 +50,9 @@ export const getAttendanceData = institutionId => loadTables(institutionId, [
 
 export const getCommunicationsData = institutionId => loadTables(institutionId, [
     ["student_updates", "student_updates", { orderBy: "visible_from" }],
-]);
-
-export const getPaymentsData = institutionId => loadTables(institutionId, [
-    ["student_fees", "student_fees", { orderBy: "due_date" }],
+    ["academic_years", "academic_years", { orderBy: "starts_on", ascending: false }],
+    ["classrooms", "classrooms"],
     ["students", "students", { columns: STUDENT_COLUMNS }],
-    ["memberships", "memberships"],
 ]);
 
 export const getSchoolYearData = institutionId => loadTables(institutionId, [

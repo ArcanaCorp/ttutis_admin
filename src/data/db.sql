@@ -14,6 +14,7 @@ CREATE TABLE public.institutions (
     description text,
     timezone text NOT NULL DEFAULT 'America/Lima'::text,
     currency character NOT NULL DEFAULT 'PEN'::bpchar,
+    payments_enabled boolean NOT NULL DEFAULT true,
     status text NOT NULL DEFAULT 'ACTIVE'::text CHECK (status = ANY (ARRAY['ACTIVE'::text, 'SUSPENDED'::text, 'CLOSED'::text])),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -244,6 +245,10 @@ CREATE TABLE public.student_updates (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     institution_id uuid NOT NULL,
     author_membership_id uuid NOT NULL,
+    audience_type text NOT NULL DEFAULT 'ALL'::text CHECK (audience_type = ANY (ARRAY['ALL'::text, 'GRADE'::text, 'CLASSROOM'::text, 'STUDENT'::text])),
+    academic_year_id uuid,
+    target_level text,
+    target_grade text,
     student_id uuid,
     classroom_id uuid,
     update_type text NOT NULL CHECK (update_type = ANY (ARRAY['ANNOUNCEMENT'::text, 'GRADE'::text, 'BEHAVIOR'::text, 'CITATION'::text, 'REPORT'::text, 'RECOMMENDATION'::text, 'NOTIFICATION'::text])),
@@ -256,30 +261,128 @@ CREATE TABLE public.student_updates (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT student_updates_pkey PRIMARY KEY (id),
     CONSTRAINT student_updates_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT student_updates_academic_year_id_fkey FOREIGN KEY (academic_year_id) REFERENCES public.academic_years(id),
     CONSTRAINT student_updates_author_membership_id_institution_id_fkey FOREIGN KEY (author_membership_id) REFERENCES public.memberships(id),
     CONSTRAINT student_updates_author_membership_id_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.memberships(institution_id),
     CONSTRAINT student_updates_student_id_institution_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
     CONSTRAINT student_updates_student_id_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.students(institution_id),
     CONSTRAINT student_updates_classroom_id_institution_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
-    CONSTRAINT student_updates_classroom_id_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.classrooms(institution_id)
+    CONSTRAINT student_updates_classroom_id_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.classrooms(institution_id),
+    CONSTRAINT student_updates_audience_target_check CHECK (
+        (audience_type = 'ALL' AND academic_year_id IS NULL AND target_level IS NULL AND target_grade IS NULL)
+        OR (audience_type = 'GRADE' AND academic_year_id IS NOT NULL AND target_level IS NOT NULL AND target_grade IS NOT NULL AND classroom_id IS NULL AND student_id IS NULL)
+        OR (audience_type = 'CLASSROOM' AND academic_year_id IS NOT NULL AND classroom_id IS NOT NULL AND student_id IS NULL AND target_level IS NULL AND target_grade IS NULL)
+        OR (audience_type = 'STUDENT' AND academic_year_id IS NULL AND target_level IS NULL AND target_grade IS NULL AND classroom_id IS NULL AND student_id IS NOT NULL)
+    )
 );
 
 CREATE TABLE public.student_fees (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     institution_id uuid NOT NULL,
+    academic_year_id uuid,
+    fee_concept_id uuid,
+    billing_rule_id uuid,
     student_id uuid NOT NULL,
     concept text NOT NULL,
     period_label text NOT NULL,
     due_date date,
     amount numeric NOT NULL CHECK (amount >= 0::numeric),
-    status text NOT NULL DEFAULT 'UNPAID'::text CHECK (status = ANY (ARRAY['PAID'::text, 'UNPAID'::text, 'WAIVED'::text, 'OVERDUE'::text])),
+    paid_amount numeric(12, 2) NOT NULL DEFAULT 0 CHECK (paid_amount >= 0 AND paid_amount <= amount),
+    status text NOT NULL DEFAULT 'UNPAID'::text CHECK (status = ANY (ARRAY['PAID'::text, 'UNPAID'::text, 'PARTIAL'::text, 'WAIVED'::text, 'OVERDUE'::text])),
     paid_at timestamp with time zone,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT student_fees_pkey PRIMARY KEY (id),
     CONSTRAINT student_fees_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT student_fees_academic_year_id_fkey FOREIGN KEY (academic_year_id) REFERENCES public.academic_years(id),
     CONSTRAINT student_fees_student_id_institution_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
     CONSTRAINT student_fees_student_id_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.students(institution_id)
+);
+
+CREATE TABLE public.fee_concepts (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    institution_id uuid NOT NULL,
+    name text NOT NULL,
+    description text,
+    concept_type text NOT NULL CHECK (concept_type = ANY (ARRAY['MATRICULA'::text, 'PENSION'::text, 'OTHER'::text])),
+    amount numeric(12, 2) NOT NULL CHECK (amount > 0),
+    status text NOT NULL DEFAULT 'ACTIVE'::text CHECK (status = ANY (ARRAY['ACTIVE'::text, 'INACTIVE'::text])),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT fee_concepts_pkey PRIMARY KEY (id),
+    CONSTRAINT fee_concepts_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT fee_concepts_institution_name_key UNIQUE (institution_id, name)
+);
+
+CREATE TABLE public.billing_rules (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    institution_id uuid NOT NULL,
+    academic_year_id uuid NOT NULL,
+    fee_concept_id uuid NOT NULL,
+    name text NOT NULL,
+    scope_type text NOT NULL CHECK (scope_type = ANY (ARRAY['INSTITUTION'::text, 'LEVEL'::text, 'GRADE'::text, 'CLASSROOM'::text, 'STUDENTS'::text])),
+    target_level text,
+    target_grade text,
+    classroom_id uuid,
+    frequency text NOT NULL CHECK (frequency = ANY (ARRAY['MONTHLY'::text, 'WEEKLY'::text, 'ONCE'::text])),
+    amount numeric(12, 2) NOT NULL CHECK (amount > 0),
+    starts_on date NOT NULL,
+    ends_on date,
+    due_day smallint CHECK (due_day BETWEEN 1 AND 31),
+    status text NOT NULL DEFAULT 'ACTIVE'::text CHECK (status = ANY (ARRAY['ACTIVE'::text, 'INACTIVE'::text])),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT billing_rules_pkey PRIMARY KEY (id),
+    CONSTRAINT billing_rules_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT billing_rules_academic_year_id_fkey FOREIGN KEY (academic_year_id) REFERENCES public.academic_years(id),
+    CONSTRAINT billing_rules_fee_concept_id_fkey FOREIGN KEY (fee_concept_id) REFERENCES public.fee_concepts(id),
+    CONSTRAINT billing_rules_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
+    CONSTRAINT billing_rules_dates_check CHECK (ends_on IS NULL OR ends_on >= starts_on),
+    CONSTRAINT billing_rules_scope_check CHECK (
+        (scope_type = 'INSTITUTION' AND target_level IS NULL AND target_grade IS NULL AND classroom_id IS NULL)
+        OR (scope_type = 'LEVEL' AND target_level IS NOT NULL AND target_grade IS NULL AND classroom_id IS NULL)
+        OR (scope_type = 'GRADE' AND target_level IS NOT NULL AND target_grade IS NOT NULL AND classroom_id IS NULL)
+        OR (scope_type = 'CLASSROOM' AND classroom_id IS NOT NULL AND target_level IS NULL AND target_grade IS NULL)
+        OR (scope_type = 'STUDENTS' AND target_level IS NULL AND target_grade IS NULL AND classroom_id IS NULL)
+    ),
+    CONSTRAINT billing_rules_month_due_day_check CHECK ((frequency = 'MONTHLY' AND due_day IS NOT NULL) OR frequency <> 'MONTHLY')
+);
+
+CREATE TABLE public.billing_rule_students (
+    institution_id uuid NOT NULL,
+    billing_rule_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT billing_rule_students_pkey PRIMARY KEY (billing_rule_id, student_id),
+    CONSTRAINT billing_rule_students_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT billing_rule_students_billing_rule_id_fkey FOREIGN KEY (billing_rule_id) REFERENCES public.billing_rules(id),
+    CONSTRAINT billing_rule_students_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+
+ALTER TABLE public.student_fees
+    ADD CONSTRAINT student_fees_fee_concept_id_fkey FOREIGN KEY (fee_concept_id) REFERENCES public.fee_concepts(id),
+    ADD CONSTRAINT student_fees_billing_rule_id_fkey FOREIGN KEY (billing_rule_id) REFERENCES public.billing_rules(id);
+
+CREATE TABLE public.student_fee_payments (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    institution_id uuid NOT NULL,
+    student_fee_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    amount numeric(12, 2) NOT NULL CHECK (amount > 0),
+    paid_at timestamp with time zone NOT NULL,
+    payment_method text NOT NULL CHECK (payment_method = ANY (ARRAY['CASH'::text, 'TRANSFER'::text, 'DEPOSIT'::text, 'OTHER'::text])),
+    reference text,
+    notes text,
+    status text NOT NULL DEFAULT 'CONFIRMED'::text CHECK (status = ANY (ARRAY['CONFIRMED'::text, 'VOIDED'::text])),
+    idempotency_key uuid NOT NULL,
+    created_by_membership_id uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT student_fee_payments_pkey PRIMARY KEY (id),
+    CONSTRAINT student_fee_payments_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.institutions(id),
+    CONSTRAINT student_fee_payments_student_fee_id_fkey FOREIGN KEY (student_fee_id) REFERENCES public.student_fees(id),
+    CONSTRAINT student_fee_payments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+    CONSTRAINT student_fee_payments_created_by_membership_id_fkey FOREIGN KEY (created_by_membership_id) REFERENCES public.memberships(id),
+    CONSTRAINT student_fee_payments_institution_request_key UNIQUE (institution_id, idempotency_key)
 );
 
 CREATE TABLE public.user_devices (
@@ -292,4 +395,20 @@ CREATE TABLE public.user_devices (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT user_devices_pkey PRIMARY KEY (id),
     CONSTRAINT user_devices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
+);
+
+CREATE TABLE public.profile_preferences (
+    profile_id uuid NOT NULL,
+    timezone text NOT NULL DEFAULT 'America/Lima'::text,
+    notifications_enabled boolean NOT NULL DEFAULT true,
+    email_notifications boolean NOT NULL DEFAULT true,
+    in_app_notifications boolean NOT NULL DEFAULT true,
+    attendance_notifications boolean NOT NULL DEFAULT true,
+    academic_notifications boolean NOT NULL DEFAULT true,
+    payment_notifications boolean NOT NULL DEFAULT true,
+    communication_notifications boolean NOT NULL DEFAULT true,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT profile_preferences_pkey PRIMARY KEY (profile_id),
+    CONSTRAINT profile_preferences_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );

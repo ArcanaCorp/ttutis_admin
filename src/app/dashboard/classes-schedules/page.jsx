@@ -424,14 +424,10 @@ export default function Page() {
                         <div className="flex gap-sm"><Button size="sm" variant="outline" icon={FileSpreadsheet} onClick={() => openRecordForm("schedule")} disabled={!canManage}>Importar horarios</Button><Button size="sm" variant="outline" onClick={() => openRecordForm("schedule")} icon={Plus} disabled={!canManage}>Agregar horario</Button></div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-md">
+                    <div className="flex flex-row items-end justify-between gap-md">
                         <div className="sm:w-64">
                             <label className="block text-xs font-medium text-gray-500 mb-1.5">Aula o sección</label>
-                            <select
-                                value={selectedClassroom?.id || ""}
-                                onChange={event => setSelectedClassroomId(event.target.value)}
-                                className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white outline-none"
-                            >
+                            <select value={selectedClassroom?.id || ""} onChange={event => setSelectedClassroomId(event.target.value)} className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white outline-none">
                                 {yearClassrooms.map(classroom => (
                                     <option key={classroom.id} value={classroom.id}>{getClassroomName(classroom)}</option>
                                 ))}
@@ -439,13 +435,8 @@ export default function Page() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                             {weekdays.map(day => (
-                                <Button
-                                    key={day.value}
-                                    size="sm"
-                                    variant={selectedDay === day.value ? "secondary" : "outline"}
-                                    onClick={() => setSelectedDay(day.value)}
-                                >
-                                    <span className="hidden sm:inline">{day.label}</span>
+                                <Button key={day.value} size="sm" variant={selectedDay === day.value ? "secondary" : "outline"} onClick={() => setSelectedDay(day.value)}>
+                                    <span className="">{day.label}</span>
                                     <span className="sm:hidden">{day.short}</span>
                                 </Button>
                             ))}

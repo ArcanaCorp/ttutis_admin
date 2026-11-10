@@ -105,6 +105,7 @@ export async function POST(request) {
         if (!student) return fail("No se encontró el alumno.", 404);
         email = student.email;
         userName = `${student.first_names} ${student.last_names}`.trim();
+        payload.membershipId = student.membership_id;
         if (student.membership_id) {
             const { data: member } = await admin.from("memberships").select("id,profile_id,email,login_code,full_name").eq("id", student.membership_id).eq("institution_id", payload.institutionId).maybeSingle();
             payload.profileId = member?.profile_id;

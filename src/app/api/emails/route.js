@@ -3,11 +3,9 @@ import { NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { resend } from "@/lib/resend/resend";
 
-const fail = (message, status = 400) =>
-    NextResponse.json({ error: message }, { status });
+const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
 
-const templateAlias =
-    process.env.RESEND_INVITATION_TEMPLATE_ID || "invitacion-ttutis";
+const templateAlias = process.env.RESEND_INVITATION_TEMPLATE_ID || "invitacion-ttutis";
 
 export async function POST(request) {
     try {
@@ -32,10 +30,7 @@ export async function POST(request) {
         }
 
         const sessionClient = await createSessionClient();
-        const {
-            data: { user },
-            error: authError,
-        } = await sessionClient.auth.getUser();
+        const { data: { user }, error: authError } = await sessionClient.auth.getUser();
 
         if (authError || !user) {
             return fail("Inicia sesión para enviar la invitación.", 401);
@@ -113,8 +108,7 @@ export async function POST(request) {
             }
         }
 
-        const { data: account, error: accountError } =
-            await admin.auth.admin.getUserById(profileId);
+        const { data: account, error: accountError } = await admin.auth.admin.getUserById(profileId);
 
         if (accountError || !account?.user?.email) {
             return fail("No se encontró el correo de la cuenta de acceso.", 404);
@@ -124,8 +118,15 @@ export async function POST(request) {
             return fail("El destinatario no coincide con el correo de la cuenta.", 400);
         }
 
+        const displayName =
+            account?.user?.user_metadata?.display_name ||
+            account?.user?.user_metadata?.full_name ||
+            account?.user?.email?.split("@")[0] ||
+            "Usuario";
+
         const emailOptions = {
             to: [to],
+            subject: `¡${displayName}, tu cuenta TTUTIS ya está activa! Accede ahora`,
             template: {
                 id: templateId,
                 variables: variables || {},
@@ -147,6 +148,7 @@ export async function POST(request) {
             id: data?.id,
             message: "La invitación se envió correctamente.",
         });
+
     } catch (error) {
         return fail(error.message || "No se pudo enviar la invitación.", 500);
     }

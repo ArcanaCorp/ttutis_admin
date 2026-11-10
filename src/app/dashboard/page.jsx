@@ -256,20 +256,21 @@ export default function Page() {
     // ========================================
 
     const paidFees = student_fees.filter(
-        fee => fee.status === "PAID"
+        fee => Number(fee.paid_amount || (fee.status === "PAID" ? fee.amount : 0)) > 0
     );
 
     const unpaidFees = student_fees.filter(
-        fee => fee.status === "UNPAID"
+        fee => !["PAID", "WAIVED"].includes(fee.status)
+            && Number(fee.amount || 0) > Number(fee.paid_amount || 0)
     );
 
     const totalPaid = paidFees.reduce(
-        (total, fee) => total + Number(fee.amount || 0),
+        (total, fee) => total + Number(fee.paid_amount || (fee.status === "PAID" ? fee.amount : 0)),
         0
     );
 
     const totalPending = unpaidFees.reduce(
-        (total, fee) => total + Number(fee.amount || 0),
+        (total, fee) => total + Math.max(0, Number(fee.amount || 0) - Number(fee.paid_amount || 0)),
         0
     );
 

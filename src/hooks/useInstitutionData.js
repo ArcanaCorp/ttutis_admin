@@ -8,7 +8,6 @@ import {
     getClassesSchedulesData,
     getCommunicationsData,
     getDashboardData,
-    getPaymentsData,
     getPeopleData,
     getSchoolYearData,
     getSettingsData,
@@ -16,6 +15,8 @@ import {
 import { insertAcademicYear, insertClassroom, insertClassrooms, insertEnrollment } from "@/services/schoolYear.services";
 import { createAcademicRecords, removeAcademicRecord, updateAcademicRecord } from "@/services/classesSchedules.services";
 import { managePerson, registerPeople } from "@/services/people.services";
+import { createNotification as insertNotification } from "@/services/communications.services";
+import { getPaymentsData, runPaymentsAction } from "@/services/payments.services";
 
 function useInstitutionDataset(loader) {
     const { currentInstitution, currentMembership, loading: profileLoading } = useProfile();
@@ -30,8 +31,42 @@ function useInstitutionDataset(loader) {
 
 export const useDashboardData = () => useInstitutionDataset(getDashboardData);
 export const useAttendanceData = () => useInstitutionDataset(getAttendanceData);
-export const useCommunicationsData = () => useInstitutionDataset(getCommunicationsData);
-export const usePaymentsData = () => useInstitutionDataset(getPaymentsData);
+export function useCommunicationsData() {
+    const dataset = useInstitutionDataset(getCommunicationsData);
+    const { currentInstitution, currentMembership, refresh } = dataset;
+    const institutionId = currentInstitution?.id;
+    const canManage = currentMembership?.role === "ADMIN" && currentMembership?.status === "ACTIVE";
+
+    const createNotification = useCallback(async values => {
+        if (!canManage || !institutionId) {
+            throw new Error("Necesitas una membresía ADMIN activa para crear notificaciones.");
+        }
+
+        const result = await insertNotification({ ...values, institutionId });
+        await refresh();
+        return result;
+    }, [canManage, institutionId, refresh]);
+
+    return { ...dataset, canManage, createNotification };
+}
+export function usePaymentsData() {
+    const dataset = useInstitutionDataset(getPaymentsData);
+    const { currentInstitution, currentMembership, refresh } = dataset;
+    const institutionId = currentInstitution?.id;
+    const canManage = currentMembership?.role === "ADMIN" && currentMembership?.status === "ACTIVE";
+
+    const managePayment = useCallback(async payload => {
+        if (!canManage || !institutionId) {
+            throw new Error("Necesitas una membresía ADMIN activa para gestionar pagos.");
+        }
+
+        const result = await runPaymentsAction({ ...payload, institutionId });
+        await refresh();
+        return result;
+    }, [canManage, institutionId, refresh]);
+
+    return { ...dataset, canManage, managePayment };
+}
 export function useSchoolYearData() {
     const dataset = useInstitutionDataset(getSchoolYearData);
     const { currentInstitution, currentMembership, refresh } = dataset;
