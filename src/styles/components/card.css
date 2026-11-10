@@ -1,0 +1,570 @@
+/* ========================================
+   CARD — BASE
+======================================== */
+
+.card {
+    --card-bg: var(--color-surface);
+    --card-color: var(--color-text-primary);
+    --card-border: var(--color-border);
+    --card-radius: var(--radius-xl);
+    --card-padding: var(--spacing-4);
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--card-padding);
+
+    color: var(--card-color);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+
+    transition:
+        background-color 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+.card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    min-width: 0;
+}
+
+.card__header-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: var(--spacing-1);
+}
+
+.card__title {
+    color: var(--color-text-primary);
+    font-family: var(--font-semibold);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+}
+
+.card__subtitle {
+    color: var(--color-text-secondary);
+    font-family: var(--font-regular);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.card__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+    min-width: 0;
+}
+
+.card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    margin-top: auto;
+    padding-top: var(--spacing-4);
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.card__description {
+    color: var(--color-text-secondary);
+    font-family: var(--font-regular);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.card__divider {
+    width: 100%;
+    height: 1px;
+    background: var(--color-border-subtle);
+}
+
+
+/* ========================================
+   CARD — VARIANTS
+======================================== */
+
+.card--default { background: var(--color-surface); }
+
+.card--stat { gap: var(--spacing-3); }
+
+.card--stat-icon { gap: var(--spacing-3); }
+
+.card--stat-trend { gap: var(--spacing-3); }
+
+.card--progress { gap: var(--spacing-4); }
+
+.card--activity { gap: var(--spacing-3); }
+
+.card--communication { gap: var(--spacing-3); }
+
+.card--horizontal {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-4);
+}
+
+.card--highlight {
+    background: var(--color-background-subtle);
+    border-color: var(--color-border-strong);
+}
+
+.card--interactive {
+    cursor: pointer;
+}
+
+.card--interactive:hover {
+    border-color: var(--color-primary-400);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.card--interactive:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 3px;
+}
+
+
+/* ========================================
+   CARD — SIZES
+======================================== */
+
+.card--xs {
+    --card-padding: var(--spacing-2);
+    --card-radius: var(--radius-sm);
+}
+
+.card--sm {
+    --card-padding: var(--spacing-3);
+    --card-radius: var(--radius-md);
+}
+
+.card--md {
+    --card-padding: var(--spacing-4);
+    --card-radius: var(--radius-xl);
+}
+
+.card--lg {
+    --card-padding: var(--spacing-6);
+    --card-radius: var(--radius-2xl);
+}
+
+.card--xl {
+    --card-padding: var(--spacing-8);
+    --card-radius: var(--radius-3xl);
+}
+
+
+/* ========================================
+   CARD — STATISTICS
+======================================== */
+
+.card__stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
+.card__stat-label {
+    color: var(--color-text-secondary);
+    font-family: var(--font-medium);
+    font-size: var(--text-sm);
+}
+
+.card__stat-value {
+    color: var(--color-text-primary);
+    font-family: var(--font-bold);
+    font-size: var(--text-3xl);
+    line-height: var(--leading-tight);
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+}
+
+.card__stat-description {
+    color: var(--color-text-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
+}
+
+.card__stat-content {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+}
+
+.card__stat-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    min-width: 0;
+}
+
+
+/* ========================================
+   CARD — ICON
+======================================== */
+
+.card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 44px;
+    height: 44px;
+
+    border-radius: var(--radius-lg);
+}
+
+.card__icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* Icon sizes */
+
+.card__icon--sm {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+}
+
+.card__icon--sm svg {
+    width: 18px;
+    height: 18px;
+}
+
+.card__icon--lg {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-xl);
+}
+
+.card__icon--lg svg {
+    width: 26px;
+    height: 26px;
+}
+
+/* Icon color variants */
+
+.card__icon--primary {
+    color: var(--color-primary-700);
+    background: var(--color-primary-100);
+}
+
+.card__icon--secondary {
+    color: var(--color-neutral-700);
+    background: var(--color-neutral-100);
+}
+
+.card__icon--success {
+    color: var(--color-success-foreground);
+    background: var(--color-success-background);
+}
+
+.card__icon--warning {
+    color: var(--color-warning-foreground);
+    background: var(--color-warning-background);
+}
+
+.card__icon--danger {
+    color: var(--color-error-foreground);
+    background: var(--color-error-background);
+}
+
+.card__icon--info {
+    color: var(--color-blue);
+    background: var(--color-info-background);
+}
+
+.card__icon--neutral {
+    color: var(--color-neutral-600);
+    background: var(--color-neutral-100);
+}
+
+
+/* ========================================
+   CARD — TREND
+======================================== */
+
+.card__trend {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    width: fit-content;
+
+    font-family: var(--font-semibold);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+}
+
+.card__trend--up {
+    color: var(--color-success-foreground);
+}
+
+.card__trend--down {
+    color: var(--color-error-foreground);
+}
+
+.card__trend--neutral {
+    color: var(--color-text-secondary);
+}
+
+.card__trend svg {
+    width: 14px;
+    height: 14px;
+}
+
+
+/* ========================================
+   CARD — PROGRESS
+======================================== */
+
+.card__progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.card__progress-label {
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    font-family: var(--font-medium);
+}
+
+.card__progress-value {
+    color: var(--color-text-primary);
+    font-family: var(--font-bold);
+    font-size: var(--text-md);
+    font-variant-numeric: tabular-nums;
+}
+
+.card__progress-track {
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+    background: var(--color-neutral-100);
+    border-radius: var(--radius-full);
+}
+
+.card__progress-bar {
+    height: 100%;
+    width: var(--progress-value, 0%);
+    background: var(--color-primary-400);
+    border-radius: inherit;
+    transition: width 400ms ease;
+}
+
+.card__progress-bar--success {
+    background: var(--color-success);
+}
+
+.card__progress-bar--warning {
+    background: var(--color-warning);
+}
+
+.card__progress-bar--danger {
+    background: var(--color-error);
+}
+
+.card__progress-bar--info {
+    background: var(--color-info);
+}
+
+.card__progress-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-2);
+    color: var(--color-text-tertiary);
+    font-size: var(--text-xs);
+}
+
+
+/* ========================================
+   CARD — ACTIVITY
+======================================== */
+
+.card__activity {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+}
+
+.card__activity-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: var(--spacing-1);
+}
+
+.card__activity-title {
+    color: var(--color-text-primary);
+    font-family: var(--font-semibold);
+    font-size: var(--text-sm);
+}
+
+.card__activity-description {
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.card__activity-date {
+    color: var(--color-text-tertiary);
+    font-size: var(--text-xs);
+}
+
+
+/* ========================================
+   CARD — COMMUNICATION
+======================================== */
+
+.card__communication {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.card__communication-title {
+    color: var(--color-text-primary);
+    font-family: var(--font-semibold);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+}
+
+.card__communication-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+}
+
+
+/* ========================================
+   CARD — BADGES
+======================================== */
+
+.card__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: var(--radius-full);
+
+    font-family: var(--font-semibold);
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.card__badge--primary {
+    color: var(--color-primary-900);
+    background: var(--color-primary-100);
+}
+
+.card__badge--success {
+    color: var(--color-success-foreground);
+    background: var(--color-success-background);
+}
+
+.card__badge--warning {
+    color: var(--color-warning-foreground);
+    background: var(--color-warning-background);
+}
+
+.card__badge--danger {
+    color: var(--color-error-foreground);
+    background: var(--color-error-background);
+}
+
+.card__badge--info {
+    color: var(--color-info-foreground);
+    background: var(--color-info-background);
+}
+
+.card__badge--neutral {
+    color: var(--color-neutral-700);
+    background: var(--color-neutral-100);
+}
+
+
+/* ========================================
+   CARD — LOADING
+======================================== */
+
+.card--loading {
+    pointer-events: none;
+}
+
+.card__skeleton {
+    height: 14px;
+    width: 100%;
+    border-radius: var(--radius-sm);
+    background: var(--color-neutral-100);
+    animation: card-pulse 1.5s ease-in-out infinite;
+}
+
+.card__skeleton--short {
+    width: 45%;
+}
+
+.card__skeleton--medium {
+    width: 70%;
+}
+
+.card__skeleton--large {
+    height: 32px;
+    width: 55%;
+}
+
+@keyframes card-pulse {
+    50% {
+        opacity: 0.45;
+    }
+}
+
+
+/* ========================================
+   CARD — RESPONSIVE
+======================================== */
+
+@media (max-width: 640px) {
+    .card--horizontal {
+        align-items: flex-start;
+    }
+
+    .card__stat-value {
+        font-size: var(--text-2xl);
+    }
+
+    .card__footer {
+        flex-wrap: wrap;
+    }
+}
+
+
+/* ========================================
+   CARD — ACCESSIBILITY
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .card,
+    .card * {
+        transition: none !important;
+        animation: none !important;
+    }
+}

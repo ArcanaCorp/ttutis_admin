@@ -1,0 +1,211 @@
+:root {
+    --font-base: var(--font-outfit, "Outfit"), Arial, sans-serif;
+    --font-light: var(--font-base);
+    --font-regular: var(--font-base);
+    --font-medium: var(--font-base);
+    --font-semibold: var(--font-base);
+    --font-bold: var(--font-base);
+    /* ========================================
+        COLORS — SUPERNOVA
+    ======================================== */
+
+    --color-primary-50: #fefce8;
+    --color-primary-100: #fff9c2;
+    --color-primary-200: #ffef88;
+    --color-primary-300: #ffdf45;
+    --color-primary-400: #fdc908;
+    --color-primary-500: #edb205;
+    --color-primary-600: #cd8901;
+    --color-primary-700: #a36105;
+    --color-primary-800: #874c0c;
+    --color-primary-900: #723e11;
+    --color-primary-950: #431f05;
+
+    --color-primary: var(--color-primary-400);
+    --color-primary-foreground: #0a0a0a;
+
+
+    /* ========================================
+        COLORS — WOODSMOKE
+    ======================================== */
+
+    --color-neutral-50: #fafafa;
+    --color-neutral-100: #f5f5f5;
+    --color-neutral-200: #e6e6e6;
+    --color-neutral-300: #d6d6d6;
+    --color-neutral-400: #a5a5a5;
+    --color-neutral-500: #767676;
+    --color-neutral-600: #575757;
+    --color-neutral-700: #434343;
+    --color-neutral-800: #292929;
+    --color-neutral-900: #181818;
+    --color-neutral-950: #0a0a0a;
+
+
+    /* ========================================
+        SEMANTIC COLORS
+    ======================================== */
+
+    --color-secondary: var(--color-neutral-800);
+    --color-secondary-foreground: var(--color-neutral-50);
+
+    --color-background: #ffffff;
+    --color-background-subtle: var(--color-neutral-50);
+    --color-background-muted: var(--color-neutral-100);
+    --color-background-elevated: #ffffff;
+
+    --color-surface: #ffffff;
+    --color-surface-secondary: var(--color-neutral-50);
+    --color-surface-tertiary: var(--color-neutral-100);
+    --color-surface-inverse: var(--color-neutral-900);
+
+    --color-text-primary: var(--color-neutral-950);
+    --color-text-secondary: var(--color-neutral-600);
+    --color-text-tertiary: var(--color-neutral-500);
+    --color-text-disabled: var(--color-neutral-400);
+    --color-text-inverse: #ffffff;
+    --color-text-link: #2f6dff;
+
+    --color-border: var(--color-neutral-200);
+    --color-border-subtle: var(--color-neutral-100);
+    --color-border-strong: var(--color-neutral-300);
+    --color-border-focus: var(--color-primary-600);
+
+
+    /* ========================================
+        STATE COLORS
+    ======================================== */
+
+    --color-error: #ff2323;
+    --color-success: #00d672;
+    --color-warning: #ffdf45;
+    --color-info: #2f6dff;
+
+    --color-error-background: #fff0f0;
+    --color-success-background: #e8fff4;
+    --color-warning-background: #fff9df;
+    --color-info-background: #edf3ff;
+    --color-error-foreground: #991b1b;
+    --color-success-foreground: #166534;
+    --color-warning-foreground: #854d0e;
+    --color-info-foreground: #1e40af;
+    --color-green: #15803d;
+    --color-blue: #1d4ed8;
+    --color-amber: #a16207;
+    --color-violet: #6d28d9;
+
+    --color-overlay: rgba(10, 10, 10, 0.5);
+
+    --color-transparent: transparent;
+    --color-white: #ffffff;
+    --color-black: #000000;
+
+    /* ========================================
+        TYPOGRAPHY — FONT SIZE
+    ======================================== */
+
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-md: 16px;
+    --text-lg: 18px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
+    --text-3xl: 30px;
+    --text-4xl: 36px;
+
+
+    /* ========================================
+        TYPOGRAPHY — LINE HEIGHT
+    ======================================== */
+
+    --leading-tight: 1.2;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.7;
+
+
+    /* ========================================
+        TYPOGRAPHY — FONT WEIGHT
+    ======================================== */
+
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+
+
+    /* ========================================
+        SPACING
+    ======================================== */
+
+    --spacing-0: 0;
+    --spacing-1: 4px;
+    --spacing-2: 8px;
+    --spacing-3: 12px;
+    --spacing-4: 16px;
+    --spacing-5: 20px;
+    --spacing-6: 24px;
+    --spacing-8: 32px;
+    --spacing-10: 40px;
+    --spacing-12: 48px;
+    --spacing-16: 64px;
+
+
+    /* ========================================
+        BORDER RADIUS
+    ======================================== */
+
+    --radius-none: 0;
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-2xl: 24px;
+    --radius-3xl: 32px;
+    --radius-full: 9999px;
+
+
+    /* ========================================
+        SHADOWS
+    ======================================== */
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.12);
+
+
+    /* ========================================
+        COMPONENTS
+    ======================================== */
+
+    /* Button */
+    --button-height-sm: 36px;
+    --button-height-md: 44px;
+    --button-height-lg: 52px;
+    --button-radius: var(--radius-md);
+
+    /* Input */
+    --input-height: 48px;
+    --input-radius: var(--radius-md);
+    --input-border-width: 1px;
+
+    /* Card */
+    --card-radius: var(--radius-xl);
+    --card-padding: var(--spacing-4);
+
+    /* Bottom Sheet */
+    --bottom-sheet-radius: var(--radius-2xl);
+
+
+    /* ========================================
+        LAYOUT
+    ======================================== */
+
+    --layout-screen-padding: 20px;
+    --layout-sidebar-width: 300px;
+    --layout-grid-min-width: 250px;
+    --layout-content-max-width: 600px;
+    --layout-header-height: 56px;
+    --layout-tab-bar-height: 64px;
+}

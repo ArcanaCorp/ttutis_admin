@@ -1,0 +1,177 @@
+/* ========================================
+   CSS RESET
+======================================== */
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+/* ========================================
+   DOCUMENT
+======================================== */
+
+html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    min-height: 100vh;
+    font-family: var(--font-base);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    color: var(--color-text-primary);
+    background: var(--color-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   TYPOGRAPHY
+======================================== */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font: inherit;
+}
+
+p {
+    overflow-wrap: break-word;
+}
+
+strong,
+b {
+    font-family: var(--font-bold);
+}
+
+em,
+i {
+    font-style: italic;
+}
+
+
+/* ========================================
+   LINKS
+======================================== */
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+
+/* ========================================
+   LISTS
+======================================== */
+
+ul,
+ol {
+    list-style: none;
+}
+
+
+/* ========================================
+   MEDIA
+======================================== */
+
+img,
+picture,
+video,
+canvas,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+img,
+video {
+    height: auto;
+}
+
+
+/* ========================================
+   FORMS
+======================================== */
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+    color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+    border: none;
+}
+
+button {
+    cursor: pointer;
+    background: none;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+    cursor: not-allowed;
+}
+
+textarea {
+    resize: vertical;
+}
+
+input,
+textarea {
+    outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--color-text-tertiary);
+    opacity: 1;
+}
+
+
+/* ========================================
+   TABLES
+======================================== */
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+
+/* ========================================
+   ACCESSIBILITY
+======================================== */
+
+:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
